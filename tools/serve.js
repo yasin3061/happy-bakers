@@ -299,7 +299,7 @@ const server = http.createServer((req, res) => {
   if (USERS) {
     const user = sessionUser(req);
     if (urlPath === '/login') { if (user) redirect(res, '/'); else loginPage(res, query, headOnly); return; }
-    if (urlPath === '/login/login.css' || urlPath === '/login/login.js') { sendFile(req, res, path.join(LOGIN_DIR, path.basename(urlPath)), headOnly, 'no-cache'); return; }
+    if (urlPath === '/login/login.css' || urlPath === '/login/login.js' || urlPath === '/login/neo-erp-mark.png') { sendFile(req, res, path.join(LOGIN_DIR, path.basename(urlPath)), headOnly, 'no-cache'); return; }
     if (urlPath === '/auth/session') {
       if (user) send(res, 200, { 'Content-Type': TYPES['.json'], 'Cache-Control': 'no-store' }, JSON.stringify({ user: user }), headOnly);
       else plain(res, 401, 'Sign in required', headOnly);

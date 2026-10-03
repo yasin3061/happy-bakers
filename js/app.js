@@ -200,12 +200,17 @@
     var nav = h('nav', { 'class': 'mk-nav', 'aria-label': 'Screens' });
     ui.append(ui.clear(sidebar),
       h('div', { 'class': 'mk-brand' },
-        h('div', { 'class': 'mk-brand__mark', 'aria-hidden': 'true' }, 'HB'),
+        /* the Neo ERP mark (The Biz CFO's artwork, vendor/brand): the product this sample shows */
+        h('img', { 'class': 'mk-brand__logo', src: 'vendor/brand/neo-erp-mark.png', alt: '', width: '32', height: '31' }),
         h('div', { 'class': 'mk-brand__text' },
           h('div', { 'class': 'mk-brand__name' }, 'Happy Bakers'),
           h('div', { 'class': 'mk-brand__tag' }, 'Neo ERP sample'))),
       nav,
-      h('div', { 'class': 'mk-sidebar__foot' }, ui.icon('info', 14), h('span', null, 'A sample on invented data. Happy Bakers is fictional.')));
+      h('div', { 'class': 'mk-sidebar__foot' },
+        h('div', { 'class': 'mk-sidebar__by' },
+          h('span', null, 'Neo ERP by'),
+          h('img', { 'class': 'mk-sidebar__bizcfo', src: 'vendor/brand/thebizcfo-logo-white-strip.png', alt: 'The Biz CFO', width: '97', height: '16' })),
+        h('div', { 'class': 'mk-sidebar__note' }, ui.icon('info', 14), h('span', null, 'A sample on invented data. Happy Bakers is fictional.'))));
     return nav;
   }
 

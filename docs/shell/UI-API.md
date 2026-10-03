@@ -708,8 +708,8 @@ root class (`.pg-<page id> ...`), colours only as `var(--token)`. A page that ne
 | Table rows | `is-selected`, `is-muted`, `is-strong` via `rowClass` |
 | Legend dot | `mk-legend-dot` + inline `style="background: var(--series-1)"` |
 
-Spacing scale is 4px (`--sp-1..8`), card radius `--radius`, type sizes `--fs-xs..hero`. The accent is a deep green (`--accent`,
-white text on it). Do not restyle `mk-*` component classes from page CSS. The CSS class prefix stays `mk-` (inherited, not
+Spacing scale is 4px (`--sp-1..8`), card radius `--radius`, type sizes `--fs-xs..hero`. The accent is The Biz CFO's electric blue (`--accent`,
+white text on it; text in the brand colour uses `--accent-text`, the deeper blue). Do not restyle `mk-*` component classes from page CSS. The CSS class prefix stays `mk-` (inherited, not
 user-visible); the JavaScript global is `HB`.
 
 ## 6. Shell - `HB.app`

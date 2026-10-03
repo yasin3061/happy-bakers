@@ -13,7 +13,7 @@
   display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
   background: var(--surface-3); color: var(--ink-2); font-size: var(--fs-sm); font-weight: 600;
 }
-.pg-guide .pg-guide__step.is-next .pg-guide__mark { background: var(--accent-soft); color: var(--accent); }
+.pg-guide .pg-guide__step.is-next .pg-guide__mark { background: var(--accent-soft); color: var(--accent-text); }
 .pg-guide .pg-guide__step.is-done .pg-guide__mark { background: var(--st-good-soft); color: var(--st-good-ink); }
 
 .pg-guide .pg-guide__main { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; line-height: 1.45; }

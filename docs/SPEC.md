@@ -725,7 +725,7 @@ Rules for every page:
 ## 10. Shell changes
 
 - Rename the global to `HB`, storage prefix, brand block ("Happy Bakers", "Neo ERP sample"), page
-  title, accent colour token (a deep green in place of the ember).
+  title. Colours are The Biz CFO's (bizcfoapp docs/DESIGN.md: brand navy sidebar, electric blue for the primary action, the blue-tinted canvas, its status and chart colours) under this sample's token names in css/tokens.css; the brand block shows the Neo ERP mark and the sidebar foot the logo of The Biz CFO (vendor/brand).
 - Top bar: the business date ("Business date 2 Oct 2026"), the persona switcher, a menu with Fresh copy
   / Reset and Sign out. No simulated loading (`latency.js` goes).
 - Banners: storage not available; log entries skipped on replay; calendar has moved on since this copy

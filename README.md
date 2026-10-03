@@ -13,6 +13,8 @@ vendor and employee in it are invented.
 ## Open it
 
 - Double-click `index.html`. It runs from the file, offline, with nothing to install. Or
+- on Windows, double-click `start.bat`: it serves the sample on http://localhost:8347 without a sign-in and opens the
+  browser. Keep its window open while you use the sample; closing it stops the sample. It needs Node.js 20 or later. Or
 - serve it with the sign-in in front, as the hosted preview runs it:
 
   ```

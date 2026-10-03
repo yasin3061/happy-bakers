@@ -199,7 +199,7 @@
 .mk-teaser__title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); color: var(--ink); font-weight: 600; }
 .mk-teaser__tier {
   display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 9px;
-  background: var(--accent-soft); color: var(--accent);
+  background: var(--accent-soft); color: var(--accent-text);
   font-size: var(--fs-xs); font-weight: 650; letter-spacing: 0.02em; white-space: nowrap;
 }
 .mk-teaser__text { margin-top: 2px; font-size: var(--fs-sm); line-height: 1.45; }

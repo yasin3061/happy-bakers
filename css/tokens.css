@@ -1,89 +1,94 @@
 /*
  * Design tokens. Light theme only.
- * Data colours were checked with the dataviz palette validator (CVD separation, normal-vision
- * floor, lightness band, contrast) - do not change a value without re-running it:
- *   series    slots 1-8 in fixed order    adjacent-pairs PASS (amber below 3:1 -> labels or table twin)
- * Orange + red side by side FAIL: keep slots 2 and 8 apart.
+ * The colours are The Biz CFO's: the palette of bizcfoapp's docs/DESIGN.md (deep navy for structure, one electric blue
+ * for the primary action, the blue-tinted canvas, its status and chart colours). The names below are this sample's own,
+ * so every screen keeps working; only the values follow DESIGN.md. Change a colour there first, then here.
+ * Chart colours were checked with the dataviz palette validator on the white card surface:
+ *   series    slots 1-6 are The Biz CFO's, in its order; 7-8 added for this shell's eight slots   adjacent pairs PASS
+ *             (amber below 3:1 on white -> every chart card carries visible labels or its table twin)
+ *   seq       The Biz CFO's six-step blue ramp, spread over the thirteen steps the heat cells read: one hue, light to dark
  */
 :root {
   color-scheme: light;
 
-  /* surfaces and ink */
-  --page: #f9f9f7;
-  --surface: #fcfcfb;
-  --surface-2: #f3f2ee;
-  --surface-3: #ebeae4;
-  --ring: rgba(11, 11, 11, 0.10);
-  --ring-strong: rgba(11, 11, 11, 0.18);
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --ink-3: #898781;
-  --grid: #e1e0d9;
-  --axis: #c3c2b7;
+  /* surfaces and ink (DESIGN.md: canvas, surface, surface-soft, hairline, ink, grid, baseline) */
+  --page: #f5f7fe;
+  --surface: #ffffff;
+  --surface-2: #f0f5fa;
+  --surface-3: #e9edf3;
+  --ring: #e3e8ee;
+  --ring-strong: #d1d5db;
+  --ink: #1f2636;
+  --ink-2: #334155;
+  --ink-3: #64748b;
+  --grid: #e9edf3;
+  --axis: #c3c8d2;
 
-  /* brand accent: UI only, never a data series. Deep green; white text on it is 6.6:1, the accent on its soft tint 5.7:1 */
-  --accent: #1f6a3d;
-  --accent-hover: #17532f;
-  --accent-soft: #e5f1e9;
+  /* brand blue: the primary action, the active tab and step, focus. Never a decoration, never text on white:
+     text in the brand colour uses --accent-text (brand-blue-deep), which reads 5.2:1 on white. */
+  --accent: #0d94fb;
+  --accent-hover: #046bd2;
+  --accent-soft: #e6f3ff;
   --accent-ink: #ffffff;
-  --focus: #2a78d6;
+  --accent-text: #046bd2;
+  --focus: #0d94fb;
 
-  /* sidebar: deep warm charcoal so the light content area carries the data */
-  --side-bg: #1d1b19;
-  --side-bg-2: #282523;
-  --side-ink: #f3f2ee;
-  --side-ink-2: #a8a59e;
+  /* sidebar: brand navy, with the blue rail on the active item */
+  --side-bg: #081b45;
+  --side-bg-2: #0d2150;
+  --side-ink: #ffffff;
+  --side-ink-2: #b8c2d9;
   --side-ring: rgba(255, 255, 255, 0.08);
-  --side-active: rgba(255, 255, 255, 0.09);
-  --side-marker: #5dbb7f; /* the accent as it reads on the dark sidebar */
+  --side-active: rgba(255, 255, 255, 0.08);
+  --side-marker: #0d94fb;
 
   /* categorical series, fixed order, never cycled past 8: a colour follows its series, never its rank */
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
-  --series-6: #008300;
-  --series-7: #4a3aa7;
-  --series-8: #e34948;
-  --series-muted: #c3c2b7; /* de-emphasis grey for "the rest" */
+  --series-1: #0d94fb;
+  --series-2: #f06b3a;
+  --series-3: #16a87a;
+  --series-4: #e0a100;
+  --series-5: #8b5cf6;
+  --series-6: #e64980;
+  --series-7: #0891b2;
+  --series-8: #a3662b;
+  --series-muted: #c3c8d2; /* de-emphasis grey for "the rest" */
 
-  /* sequential (magnitude): one hue, light to dark */
-  --seq-100: #cde2fb;
-  --seq-150: #b7d3f6;
-  --seq-200: #9ec5f4;
-  --seq-250: #86b6ef;
-  --seq-300: #6da7ec;
-  --seq-350: #5598e7;
-  --seq-400: #3987e5;
-  --seq-450: #2a78d6;
-  --seq-500: #256abf;
-  --seq-550: #1c5cab;
-  --seq-600: #184f95;
-  --seq-650: #104281;
-  --seq-700: #0d366b;
+  /* sequential (magnitude): one hue, light to dark, ending on brand navy */
+  --seq-100: #e6f3ff;
+  --seq-150: #d2e9fe;
+  --seq-200: #bddffd;
+  --seq-250: #a3d2fc;
+  --seq-300: #85c4f9;
+  --seq-350: #67b5f5;
+  --seq-400: #4ca3ed;
+  --seq-450: #3092e5;
+  --seq-500: #207ecf;
+  --seq-550: #136bb7;
+  --seq-600: #0b5497;
+  --seq-650: #09376e;
+  --seq-700: #081b45;
 
-  /* diverging (polarity): blue <-> red around a neutral grey */
-  --div-neg-2: #d03b3b;
-  --div-neg-1: #ee9c97;
-  --div-mid: #f0efec;
-  --div-pos-1: #86b6ef;
-  --div-pos-2: #256abf;
+  /* diverging (polarity): The Biz CFO's positive blue and negative red around a neutral grey */
+  --div-neg-2: #d93b3b;
+  --div-neg-1: #ec9d9d;
+  --div-mid: #e3e8ee;
+  --div-pos-1: #6db8f7;
+  --div-pos-2: #0d94fb;
 
-  /* status: reserved, always shipped with an icon and a label */
-  --st-good: #0ca30c;
-  --st-warn: #fab219;
-  --st-serious: #ec835a;
-  --st-critical: #d03b3b;
-  --st-good-ink: #006300;
-  --st-warn-ink: #7a5200;
-  --st-serious-ink: #8f3b17;
-  --st-critical-ink: #a32222;
-  --st-good-soft: #e6f5e6;
-  --st-warn-soft: #fdf1d5;
-  --st-serious-soft: #fbe9e1;
-  --st-critical-soft: #f9e3e3;
-  --st-neutral-soft: #ebeae4;
+  /* status: reserved, always shipped with an icon and a label. "serious" is The Biz CFO's attention orange. */
+  --st-good: #0f9d58;
+  --st-warn: #f5a623;
+  --st-serious: #ff8539;
+  --st-critical: #d93b3b;
+  --st-good-ink: #0b7a44;
+  --st-warn-ink: #8a5a00;
+  --st-serious-ink: #9a4b0f;
+  --st-critical-ink: #b02a2a;
+  --st-good-soft: #e6f6ee;
+  --st-warn-soft: #fff5e0;
+  --st-serious-soft: #fff0e7;
+  --st-critical-soft: #fdecec;
+  --st-neutral-soft: #e9edf3;
 
   /* type */
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -95,7 +100,7 @@
   --fs-2xl: 24px;
   --fs-hero: 52px;
 
-  /* space, radius, elevation */
+  /* space, radius, elevation (shadows are navy-tinted, never grey) */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -106,7 +111,7 @@
   --radius-sm: 6px;
   --radius: 10px;
   --radius-lg: 14px;
-  --shadow-pop: 0 8px 28px rgba(11, 11, 11, 0.14), 0 0 0 1px rgba(11, 11, 11, 0.08);
+  --shadow-pop: 0 8px 28px rgba(8, 27, 69, 0.14), 0 0 0 1px rgba(8, 27, 69, 0.08);
 
   --sidebar-w: 232px;
   --topbar-h: 56px;

@@ -72,15 +72,7 @@ svg { flex: none; }
   padding: 0 var(--sp-4);
   box-shadow: inset 0 -1px 0 var(--side-ring);
 }
-.mk-brand__mark {
-  display: grid; place-items: center;
-  width: 32px; height: 32px; flex: none;
-  border-radius: 9px;
-  background: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--side-ring);
-  color: var(--accent-ink);
-  font-size: var(--fs-sm); font-weight: 700; letter-spacing: 0.04em;
-}
+.mk-brand__logo { display: block; width: 32px; height: 31px; flex: none; object-fit: contain; }
 .mk-brand__text { min-width: 0; line-height: 1.2; }
 .mk-brand__name { font-size: var(--fs-lg); font-weight: 650; letter-spacing: -0.01em; white-space: nowrap; }
 .mk-brand__tag { margin-top: 2px; font-size: var(--fs-xs); color: var(--side-ink-2); letter-spacing: 0.02em; }
@@ -117,12 +109,15 @@ svg { flex: none; }
 }
 
 .mk-sidebar__foot {
-  flex: none; display: flex; align-items: flex-start; gap: var(--sp-2);
+  flex: none; display: flex; flex-direction: column; gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-4) var(--sp-4);
   box-shadow: inset 0 1px 0 var(--side-ring);
   color: var(--side-ink-2); font-size: var(--fs-xs); line-height: 1.4;
 }
-.mk-sidebar__foot svg { margin-top: 1px; }
+.mk-sidebar__by { display: flex; align-items: center; gap: var(--sp-2); }
+.mk-sidebar__bizcfo { display: block; width: 97px; height: 16px; flex: none; object-fit: contain; }
+.mk-sidebar__note { display: flex; align-items: flex-start; gap: var(--sp-2); }
+.mk-sidebar__note svg { flex: none; margin-top: 1px; }
 
 /* top bar */
 
@@ -187,7 +182,7 @@ svg { flex: none; }
   font-size: var(--fs-sm);
   box-shadow: inset 0 -1px 0 var(--ring);
 }
-.mk-banner__item--info { background: var(--accent-soft); color: var(--accent); }
+.mk-banner__item--info { background: var(--accent-soft); color: var(--accent-text); }
 .mk-banner__item--critical { background: var(--st-critical-soft); color: var(--st-critical-ink); }
 .mk-banner__text { min-width: 0; }
 .mk-banner__action {
@@ -241,7 +236,7 @@ svg { flex: none; }
 .mk-good { color: var(--st-good-ink); }
 .mk-bad { color: var(--st-critical-ink); }
 .mk-warn { color: var(--st-warn-ink); }
-.mk-link { color: var(--accent); text-decoration: none; font-weight: 550; cursor: pointer; }
+.mk-link { color: var(--accent-text); text-decoration: none; font-weight: 550; cursor: pointer; }
 .mk-link:hover { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 2px; }
 .mk-sr {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;

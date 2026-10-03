@@ -23,7 +23,7 @@
 .mk-btn--danger:hover { background: var(--st-critical-soft); }
 .mk-btn--ghost { background: transparent; box-shadow: none; color: var(--ink-2); }
 .mk-btn--ghost:hover { background: var(--surface-2); color: var(--ink); }
-.mk-btn--text { height: auto; padding: 2px 4px; background: transparent; box-shadow: none; color: var(--accent); }
+.mk-btn--text { height: auto; padding: 2px 4px; background: transparent; box-shadow: none; color: var(--accent-text); }
 .mk-btn--text:hover { background: transparent; color: var(--accent-hover); text-decoration: underline; text-underline-offset: 2px; }
 .mk-btn--sm { height: 28px; padding: 0 10px; font-size: var(--fs-sm); }
 .mk-btn--icon { width: 32px; padding: 0; }
@@ -41,7 +41,7 @@
 .mk-btn--ghost[disabled]:hover, .mk-btn--ghost[aria-disabled="true"]:hover,
 .mk-btn--ghost[disabled]:active, .mk-btn--ghost[aria-disabled="true"]:active { background: transparent; color: var(--ink-2); }
 .mk-btn--text[disabled]:hover, .mk-btn--text[aria-disabled="true"]:hover,
-.mk-btn--text[disabled]:active, .mk-btn--text[aria-disabled="true"]:active { background: transparent; color: var(--accent); text-decoration: none; }
+.mk-btn--text[disabled]:active, .mk-btn--text[aria-disabled="true"]:active { background: transparent; color: var(--accent-text); text-decoration: none; }
 
 /* ------------------------------------------------------------------ cards */
 
@@ -208,7 +208,7 @@ th[aria-sort="ascending"] .mk-th-sort svg, th[aria-sort="descending"] .mk-th-sor
   background: var(--surface-3); color: var(--ink);
   font-size: var(--fs-xs); font-weight: 650; letter-spacing: 0.02em;
 }
-.mk-avatar--accent { background: var(--accent-soft); color: var(--accent); }
+.mk-avatar--accent { background: var(--accent-soft); color: var(--accent-text); }
 .mk-avatar--sm { width: 22px; height: 22px; font-size: 10px; }
 
 /* ----------------------------------------------------- tabs and segmented */
@@ -233,7 +233,7 @@ th[aria-sort="ascending"] .mk-th-sort svg, th[aria-sort="descending"] .mk-th-sor
   background: var(--surface-3); color: var(--ink-2);
   font-size: var(--fs-xs); font-weight: 600; font-variant-numeric: tabular-nums;
 }
-.mk-tab[aria-selected="true"] .mk-tab__count { background: var(--accent-soft); color: var(--accent); }
+.mk-tab[aria-selected="true"] .mk-tab__count { background: var(--accent-soft); color: var(--accent-text); }
 
 /* One segmented control for the whole app. HB.ui.segmented() builds .mk-seg; the chart card builds .mk-chart__seg
    (charts.js may not depend on ui.js), so both class pairs share these rules and cannot drift apart. */
