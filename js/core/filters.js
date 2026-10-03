@@ -1,0 +1,325 @@
+/*
+ * HB.filters - the one global filter row (date range, unit) and its state.
+ * State lives inside the 'prefs' store key and every change emits 'filters:changed'.
+ * Every date preset is relative to HB.calendar.today (the business date of this copy), never the device clock.
+ * The data layer is optional: units come from HB.masters when present, else HB.config, else there is no unit control.
+ */
+(function (root) {
+  'use strict';
+
+  var HB = root.HB;
+  if (!HB || !HB.ui || !root.document) return;
+  var ui = HB.ui, h = ui.h, D = HB.dates;
+
+  var PRESETS = [
+    { id: 'today', label: 'Today' },
+    { id: 'yesterday', label: 'Yesterday' },
+    { id: 'last7', label: 'Last 7 days' },
+    { id: 'thisMonth', label: 'This month' },
+    { id: 'lastMonth', label: 'Last month' },
+    { id: 'sinceGoLive', label: 'Since go-live' },
+    { id: 'custom', label: 'Custom range' }
+  ];
+  var DEFAULT_PRESET = 'thisMonth';
+  var UNIT = { key: 'unitIds', all: 'All locations', title: 'Locations', icon: 'store' };
+
+  function clampDate(iso) { return D.max(HB.calendar.goLive, D.min(HB.calendar.today, iso)); }
+
+  /* ------------------------------------------------------------- options */
+
+  /** A master list as an array, whether the data layer keeps it as an array or as a map by id. */
+  function listOf(x) {
+    if (Array.isArray(x)) return x;
+    if (x && typeof x === 'object') return Object.keys(x).map(function (k) { return x[k]; });
+    return [];
+  }
+
+  /** The units (the factory and the stores) the persona may see: [{id, label}]. */
+  function unitOptions() {
+    var source = listOf(HB.masters && HB.masters.units);
+    if (!source.length) source = listOf(HB.config && HB.config.units);
+    var scope = HB.session.scope();
+    return source.filter(function (u) { return u && u.id && scope.unit(u.id); }).map(function (u) {
+      return { id: u.id, label: (u.name || u.label || String(u.id)) + (u.active === false ? ' (closed)' : '') };
+    });
+  }
+
+  function options(kind) { return kind === 'unit' ? unitOptions() : []; }
+
+  /** Selection limited to the valid options; null when it means "everything in scope". */
+  function clean(ids, opts) {
+    if (!Array.isArray(ids) || !ids.length) return null;
+    var picked = opts.filter(function (o) { return ids.indexOf(o.id) !== -1; }).map(function (o) { return o.id; });
+    return picked.length === 0 || picked.length === opts.length ? null : picked;
+  }
+
+  /* --------------------------------------------------------------- dates */
+
+  function rangeFor(presetId, custom) {
+    var today = HB.calendar.today;
+    var from, to = today;
+    switch (presetId) {
+      case 'today': from = today; break;
+      case 'yesterday': from = to = D.addDays(today, -1); break;
+      case 'last7': from = D.addDays(today, -6); break;
+      case 'lastMonth':
+        to = D.addDays(D.monthStart(today), -1);
+        from = D.monthStart(to);
+        break;
+      case 'sinceGoLive': from = HB.calendar.goLive; break;
+      case 'custom':
+        from = custom && D.isIso(custom.from) ? custom.from : D.monthStart(today);
+        to = custom && D.isIso(custom.to) ? custom.to : today;
+        break;
+      default: from = D.monthStart(today);
+    }
+    from = clampDate(from);
+    to = clampDate(to);
+    if (from > to) { var swap = from; from = to; to = swap; }
+    return { from: from, to: to };
+  }
+
+  function rangeLabel(r) {
+    var sameYear = r.from.slice(0, 4) === r.to.slice(0, 4);
+    if (r.from === r.to) return D.label(r.to, 'd MMM yyyy');
+    return D.label(r.from, sameYear ? 'd MMM' : 'd MMM yyyy') + ' - ' + D.label(r.to, 'd MMM yyyy');
+  }
+
+  /* --------------------------------------------------------------- state */
+
+  function blank() { return { preset: DEFAULT_PRESET, from: null, to: null, unitIds: null }; }
+
+  function load() {
+    var saved = (HB.store.get('prefs', {}) || {}).filters || {};
+    var s = blank();
+    if (PRESETS.some(function (p) { return p.id === saved.preset; })) s.preset = saved.preset;
+    if (D.isIso(saved.from)) s.from = saved.from;
+    if (D.isIso(saved.to)) s.to = saved.to;
+    if (Array.isArray(saved.unitIds) && saved.unitIds.length) s.unitIds = saved.unitIds.slice();
+    return s;
+  }
+
+  var state = load();
+
+  function persist() {
+    var prefs = HB.store.get('prefs', {}) || {};
+    prefs.filters = { preset: state.preset, from: state.from, to: state.to, unitIds: state.unitIds };
+    HB.store.set('prefs', prefs);
+  }
+
+  function get() {
+    var r = rangeFor(state.preset, state);
+    return { from: r.from, to: r.to, unitIds: clean(state.unitIds, unitOptions()), preset: state.preset };
+  }
+
+  /** set({preset}) | set({from, to}) (implies preset 'custom') | set({unitIds}) - null means every unit in scope. */
+  function set(partial) {
+    partial = partial || {};
+    if (partial.preset && PRESETS.some(function (p) { return p.id === partial.preset; })) state.preset = partial.preset;
+    if (partial.from !== undefined || partial.to !== undefined) {
+      if (!partial.preset) state.preset = 'custom';
+      var r = rangeFor('custom', { from: partial.from || state.from, to: partial.to || state.to });
+      state.from = r.from;
+      state.to = r.to;
+    }
+    if (partial.unitIds !== undefined) state.unitIds = clean(partial.unitIds, unitOptions());
+    persist();
+    HB.bus.emit('filters:changed', get());
+  }
+
+  function reset() {
+    state = blank();
+    persist();
+    HB.bus.emit('filters:changed', get());
+  }
+
+  function isDefault(showList) {
+    var shown = showList && showList.length ? showList : ['date', 'unit'];
+    var f = get();
+    return !shown.some(function (kind) {
+      if (kind === 'date') return f.preset !== DEFAULT_PRESET;
+      return kind === 'unit' ? f.unitIds !== null : false;
+    });
+  }
+
+  function summary(kind) {
+    if (kind !== 'unit') return '';
+    var opts = unitOptions(), ids = get().unitIds;
+    if (!ids) return opts.length === 1 ? opts[0].label : UNIT.all;
+    var firstOpt = opts.filter(function (o) { return o.id === ids[0]; })[0];
+    return (firstOpt ? firstOpt.label : ids[0]) + (ids.length > 1 ? ' +' + (ids.length - 1) : '');
+  }
+
+  function daysText(f) {
+    var days = D.diffDays(f.from, f.to) + 1;
+    return days + (days === 1 ? ' day' : ' days');
+  }
+
+  function describe() {
+    var f = get();
+    return rangeLabel(f) + ', ' + daysText(f);
+  }
+
+  /* ----------------------------------------------------------------- bar */
+
+  var mounted = null; /* {container, showList, refresh} */
+
+  function menuRow(o) {
+    return h('button', { type: 'button', role: o.role || 'menuitem', 'aria-checked': o.role ? 'false' : null, 'class': 'mk-menu__item', 'data-autofocus': o.autofocus ? '' : null, onClick: o.onClick },
+      o.lead || null,
+      h('span', { 'class': 'mk-menu__main' }, o.label),
+      o.hint ? h('span', { 'class': 'mk-menu__hint' }, o.hint) : null,
+      o.tick ? h('span', { 'class': 'mk-menu__tick' }) : null);
+  }
+
+  function openDatePopover(anchor) {
+    var pop = null;
+    var current = get();
+    var fromInput = ui.form.dateInput({ value: current.from, min: HB.calendar.goLive, max: HB.calendar.today, ariaLabel: 'From date' });
+    var toInput = ui.form.dateInput({ value: current.to, min: HB.calendar.goLive, max: HB.calendar.today, ariaLabel: 'To date' });
+    var error = h('div', { 'class': 'mk-field__error', style: { gridColumn: '1 / -1' } });
+    error.hidden = true;
+    var custom = h('div', { 'class': 'mk-menu__custom' },
+      h('label', null, 'From', fromInput), h('label', null, 'To', toInput), error,
+      ui.button({ label: 'Apply range', variant: 'primary', size: 'sm', onClick: function () {
+        if (!D.isIso(fromInput.value) || !D.isIso(toInput.value)) { error.hidden = false; ui.clear(error).appendChild(root.document.createTextNode('Pick both dates')); return; }
+        if (pop) pop.close();
+        set({ preset: 'custom', from: fromInput.value, to: toInput.value });
+      } }));
+    custom.hidden = current.preset !== 'custom';
+
+    var rows = PRESETS.map(function (p) {
+      var selected = p.id === current.preset;
+      var row = menuRow({
+        label: p.label, tick: true, autofocus: selected,
+        hint: p.id === 'custom' ? null : rangeLabel(rangeFor(p.id)),
+        onClick: function () {
+          if (p.id === 'custom') { custom.hidden = false; if (pop) pop.reposition(); fromInput.focus(); return; }
+          if (pop) pop.close();
+          set({ preset: p.id });
+        }
+      });
+      if (selected) { row.classList.add('is-selected'); row.lastChild.appendChild(ui.icon('check')); }
+      return row;
+    });
+    pop = ui.popover(anchor, [h('div', { 'class': 'mk-menu__heading' }, 'Date range'), rows, custom], { width: 300 });
+  }
+
+  function openUnitPopover(anchor) {
+    var opts = unitOptions();
+    var boxes = {};
+    function box() { return h('input', { type: 'checkbox', 'class': 'mk-menu__check', tabindex: -1, 'aria-hidden': 'true' }); }
+    function sync() {
+      var ids = get().unitIds;
+      Object.keys(boxes).forEach(function (id) {
+        var on = id === '*' ? !ids : !!ids && ids.indexOf(id) !== -1;
+        boxes[id].input.checked = on;
+        boxes[id].row.setAttribute('aria-checked', on ? 'true' : 'false');
+        boxes[id].row.classList.toggle('is-selected', id === '*' && on);
+      });
+    }
+    function makeRow(id, label, onClick) {
+      var input = box();
+      var row = menuRow({ role: 'menuitemcheckbox', label: label, autofocus: id === '*', onClick: onClick, lead: input });
+      boxes[id] = { input: input, row: row };
+      return row;
+    }
+    var rows = [makeRow('*', UNIT.all, function () { set({ unitIds: null }); sync(); })];
+    rows.push(h('div', { 'class': 'mk-menu__sep', role: 'separator' }));
+    opts.forEach(function (opt) {
+      rows.push(makeRow(opt.id, opt.label, function () {
+        var ids = (get().unitIds || []).slice();
+        var at = ids.indexOf(opt.id);
+        if (at === -1) ids.push(opt.id); else ids.splice(at, 1);
+        set({ unitIds: ids.length ? ids : null });
+        sync();
+      }));
+    });
+    ui.popover(anchor, [h('div', { 'class': 'mk-menu__heading' }, UNIT.title), rows], { width: 240 });
+    sync();
+  }
+
+  /**
+   * mountBar(container, ['date', 'unit']) - renders only the requested controls, plus "Reset filters" when one of
+   * them is not at its default. An empty list hides the bar.
+   */
+  function mountBar(container, showList) {
+    var show = (showList || []).filter(function (k) { return k === 'date' || k === 'unit'; });
+    ui.clear(container);
+    mounted = null;
+    if (!show.length) { container.hidden = true; return; }
+    container.hidden = false;
+    container.setAttribute('role', 'toolbar');
+    container.setAttribute('aria-label', 'Filters');
+
+    var updaters = [];
+    if (show.indexOf('date') !== -1) {
+      var dateValue = h('span', { 'class': 'mk-fctl__val' });
+      var dateBtn = h('button', { type: 'button', 'class': 'mk-fctl', onClick: function () { openDatePopover(dateBtn); } }, ui.icon('calendar'), dateValue, ui.icon('chevron-down', 14));
+      container.appendChild(dateBtn);
+      updaters.push(function (f) {
+        var preset = PRESETS.filter(function (p) { return p.id === f.preset; })[0];
+        dateValue.textContent = f.preset === 'custom' ? rangeLabel(f) : preset.label;
+        dateBtn.classList.toggle('is-set', f.preset !== DEFAULT_PRESET);
+        dateBtn.setAttribute('aria-label', 'Date range: ' + dateValue.textContent);
+      });
+    }
+    if (show.indexOf('unit') !== -1) {
+      var opts = unitOptions();
+      if (opts.length === 1) {
+        /* a persona scoped to one unit (the store manager) sees where it stands, with nothing to choose */
+        container.appendChild(h('span', { 'class': 'mk-fctl mk-fctl--locked', title: 'Your role is limited to this location' }, ui.icon('lock', 14), h('span', { 'class': 'mk-fctl__val' }, opts[0].label)));
+      } else if (opts.length > 1) {
+        var unitValue = h('span', { 'class': 'mk-fctl__val' });
+        var unitBtn = h('button', { type: 'button', 'class': 'mk-fctl', onClick: function () { openUnitPopover(unitBtn); } }, ui.icon(UNIT.icon), unitValue, ui.icon('chevron-down', 14));
+        container.appendChild(unitBtn);
+        updaters.push(function (f) {
+          unitValue.textContent = summary('unit');
+          unitBtn.classList.toggle('is-set', f.unitIds !== null);
+          unitBtn.setAttribute('aria-label', UNIT.title + ': ' + unitValue.textContent);
+        });
+      }
+    }
+
+    var resetBtn = ui.button({ label: 'Reset filters', variant: 'text', size: 'sm', onClick: reset });
+    var rangeText = h('span', { 'class': 'mk-filterbar__range' });
+    container.appendChild(resetBtn);
+    container.appendChild(h('span', { 'class': 'mk-filterbar__spacer' }));
+    if (show.indexOf('date') !== -1) container.appendChild(rangeText);
+
+    function refresh() {
+      var f = get();
+      updaters.forEach(function (fn) { fn(f); });
+      resetBtn.hidden = isDefault(show);
+      /* a custom range is already written out on its control: beside it, only how long it is */
+      rangeText.textContent = f.preset === 'custom' ? daysText(f) : describe();
+    }
+    mounted = { container: container, showList: show, refresh: refresh };
+    refresh();
+  }
+
+  HB.bus.on('filters:changed', function () { if (mounted) mounted.refresh(); });
+
+  /* a new persona may see fewer units: drop what it cannot see and rebuild the control */
+  HB.bus.on('session:changed', function () {
+    var before = JSON.stringify(state.unitIds);
+    state.unitIds = clean(state.unitIds, unitOptions());
+    if (mounted) mountBar(mounted.container, mounted.showList);
+    if (JSON.stringify(state.unitIds) !== before) { persist(); HB.bus.emit('filters:changed', get()); }
+  });
+
+  HB.bus.on('store:changed', function (evt) {
+    var key = evt && evt.key;
+    if (key === '*') { state = blank(); if (mounted) mounted.refresh(); return; }
+    /* a posted master change may have added or closed a location: the unit control is rebuilt from the masters */
+    if (key !== 'prefs' && mounted && mounted.showList.indexOf('unit') !== -1) mountBar(mounted.container, mounted.showList);
+  });
+
+  HB.filters = {
+    get: get, set: set, reset: reset, mountBar: mountBar, isDefault: isDefault, describe: describe,
+    options: options, summary: summary,
+    presets: function () { return PRESETS.map(function (p) { var r = p.id === 'custom' ? null : rangeFor(p.id); return { id: p.id, label: p.label, from: r && r.from, to: r && r.to }; }); },
+    range: function (presetId) { return rangeFor(presetId, state); },
+    rangeLabel: rangeLabel
+  };
+})(typeof window !== 'undefined' ? window : globalThis);

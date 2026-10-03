@@ -1,0 +1,4 @@
+/* sys-notifications: every selector under .pg-sys-notifications; colours as var(--token) only. */
+
+/* the email (subject and text) wraps, but never into a column too narrow to read: the table scrolls sideways first */
+.pg-sys-notifications td.pg-sys-notifications__mail { min-width: 280px; }

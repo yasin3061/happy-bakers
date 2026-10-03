@@ -1,0 +1,308 @@
+/*
+ * The document kit built by js/core/forms.js (HB.forms): decimal inputs, type-ahead pickers, the line grid, the
+ * matrix grid, totals, the document form and view, the list of a document page, the teaser card and the paper form.
+ * Colours only through css/tokens.css. Page authors use HB.forms.*; these class names are an implementation detail.
+ */
+
+/* --------------------------------------------------------- decimal inputs */
+/* The box is the wrapper, the <input> inside has no chrome: a prefix and a unit of any length sit beside the figure. */
+
+.mk-numin {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; height: 34px; padding: 0 10px; min-width: 0;
+  border-radius: var(--radius-sm); background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--ring-strong);
+  transition: box-shadow 120ms ease;
+}
+.mk-numin:hover { box-shadow: inset 0 0 0 1px var(--ink-3); }
+.mk-numin:focus-within { box-shadow: inset 0 0 0 2px var(--focus); }
+.mk-numin.is-invalid, .mk-numin:has(input[aria-invalid="true"]) { box-shadow: inset 0 0 0 2px var(--st-critical); }
+.mk-numin.is-off { background: var(--surface-2); color: var(--ink-2); }
+.mk-numin__input {
+  flex: 1; min-width: 0; width: 100%; height: 100%; padding: 0;
+  border: 0; background: transparent; color: inherit;
+  font-size: var(--fs-md); text-align: right; font-variant-numeric: tabular-nums;
+}
+.mk-numin__input:focus { outline: none; }
+.mk-numin__input::placeholder { color: var(--ink-3); }
+.mk-numin__input[disabled], .mk-numin__input[readonly] { cursor: not-allowed; }
+.mk-numin__pre, .mk-numin__suf { flex: none; color: var(--ink-2); font-size: var(--fs-sm); white-space: nowrap; pointer-events: none; }
+.mk-numin__pre { color: var(--ink-3); }
+
+/* inside a grid cell: no box of its own, the cell draws the focus */
+.mk-numin--cell, .mk-numin--cell:hover { height: 32px; padding: 0 8px; border-radius: 0; background: transparent; box-shadow: none; }
+.mk-numin--cell:focus-within { box-shadow: inset 0 0 0 2px var(--focus); background: var(--surface); }
+.mk-numin--cell.is-invalid, .mk-numin--cell:has(input[aria-invalid="true"]) { box-shadow: inset 0 0 0 2px var(--st-critical); }
+.mk-input--cell, .mk-input--cell:hover { height: 32px; padding: 0 8px; border-radius: 0; background: transparent; box-shadow: none; }
+.mk-input--cell:focus { box-shadow: inset 0 0 0 2px var(--focus); background: var(--surface); }
+.mk-input--cell[aria-invalid="true"] { box-shadow: inset 0 0 0 2px var(--st-critical); }
+.mk-selectwrap--cell .mk-select, .mk-selectwrap--cell .mk-select:hover { height: 32px; padding-left: 8px; border-radius: 0; background: transparent; box-shadow: none; }
+.mk-selectwrap--cell .mk-select:focus { box-shadow: inset 0 0 0 2px var(--focus); background: var(--surface); }
+
+/* --------------------------------------------------------- type-ahead picker */
+
+.mk-combo { position: relative; display: block; min-width: 0; }
+.mk-combo__input { padding-right: 28px; text-overflow: ellipsis; }
+.mk-combo > svg { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+.mk-combo--cell > svg { right: 6px; opacity: 0; }
+.mk-combo--cell:hover > svg, .mk-combo--cell:focus-within > svg { opacity: 1; }
+
+/* the list lives on the overlay layer, above drawers and modals (60) and popovers (70) */
+.mk-combo__list {
+  position: fixed; z-index: 75; max-height: 280px; overflow-y: auto;
+  padding: var(--sp-1); border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow-pop);
+}
+.mk-combo__opt {
+  display: flex; align-items: baseline; gap: var(--sp-3);
+  min-height: 30px; padding: 5px 10px; border-radius: var(--radius-sm);
+  font-size: var(--fs-md); cursor: pointer;
+}
+.mk-combo__opt:hover, .mk-combo__opt.is-active { background: var(--surface-2); }
+.mk-combo__opt.is-active { box-shadow: inset 2px 0 0 var(--accent); }
+.mk-combo__opt.is-current .mk-combo__label { font-weight: 650; }
+.mk-combo__opt.is-disabled { color: var(--ink-3); cursor: not-allowed; }
+.mk-combo__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mk-combo__sub { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); font-size: var(--fs-xs); }
+.mk-combo__empty { padding: 8px 10px; color: var(--ink-2); font-size: var(--fs-sm); }
+
+/* -------------------------------------------------------------- line grid */
+
+.mk-lg { display: flex; flex-direction: column; min-width: 0; }
+.mk-lg__scroll { overflow-x: auto; min-width: 0; }
+.mk-lg__table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-md); table-layout: auto; }
+.mk-lg__table th {
+  height: 32px; padding: 0 8px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--grid); border-bottom: 1px solid var(--axis);
+  color: var(--ink-2); font-size: var(--fs-sm); font-weight: 600; text-align: left; white-space: nowrap;
+}
+.mk-lg__table th.is-num, .mk-lg__table td.is-num { text-align: right; font-variant-numeric: tabular-nums; }
+.mk-lg__table td {
+  height: 34px; padding: 0;
+  border-bottom: 1px solid var(--grid); border-right: 1px solid var(--grid);
+  vertical-align: middle; white-space: nowrap;
+}
+.mk-lg__table td:last-child, .mk-lg__table th:last-child { border-right: 0; }
+.mk-lg__table td.mk-lg__read { padding: 0 8px; color: var(--ink); background: var(--surface-2); }
+.mk-lg--readonly .mk-lg__table td.mk-lg__read { background: transparent; }
+.mk-lg__table td.mk-lg__edit { min-width: 96px; }
+.mk-lg__table td.is-error { background: var(--st-critical-soft); }
+.mk-lg__table td.is-warn { background: var(--st-warn-soft); }
+.mk-lg__table .mk-lg__n { width: 36px; min-width: 36px; padding: 0 8px; text-align: right; color: var(--ink-3); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; background: var(--surface-2); }
+.mk-lg__table .mk-lg__x { width: 34px; min-width: 34px; text-align: center; border-right: 0; }
+.mk-lg__x .mk-btn { width: 24px; height: 24px; color: var(--ink-3); }
+.mk-lg__x .mk-btn:hover { color: var(--st-critical-ink); background: var(--st-critical-soft); }
+.mk-lg__msg td { height: auto; padding: 4px 8px 6px; border-right: 0; background: var(--st-critical-soft); white-space: normal; }
+.mk-lg__msg--warn td { background: var(--st-warn-soft); }
+.mk-lg__msg td:first-child { background: var(--surface-2); }
+.mk-lg__none td { height: 56px; padding: 0 var(--sp-4); border-right: 0; color: var(--ink-2); text-align: center; }
+.mk-lg__table tfoot td {
+  height: 36px; padding: 0 8px;
+  border-top: 1px solid var(--axis); border-bottom: 0; border-right: 0;
+  background: var(--surface); font-weight: 650;
+}
+.mk-lg__table tfoot .mk-lg__n { background: var(--surface); }
+.mk-lg__bar { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-top: 1px solid var(--grid); }
+.mk-lg__hint { color: var(--ink-2); font-size: var(--fs-xs); }
+
+/* ------------------------------------------------------------ matrix grid */
+
+.mk-mx { min-width: 0; }
+.mk-mx__scroll { overflow: auto; min-width: 0; max-height: 70vh; }
+.mk-mx__table { border-collapse: separate; border-spacing: 0; font-size: var(--fs-md); font-variant-numeric: tabular-nums; }
+.mk-mx__table th, .mk-mx__table td {
+  height: 30px; padding: 0 6px;
+  border-bottom: 1px solid var(--grid); border-right: 1px solid var(--grid);
+  text-align: right; white-space: nowrap; background: var(--surface);
+}
+.mk-mx__table thead th {
+  position: sticky; top: 0; z-index: 2;
+  height: 44px; min-width: 62px; max-width: 96px; padding: 4px 6px;
+  background: var(--surface-2); border-bottom: 1px solid var(--axis);
+  color: var(--ink-2); font-size: var(--fs-xs); font-weight: 600; line-height: 1.2;
+  white-space: normal; vertical-align: bottom; overflow-wrap: anywhere;
+}
+.mk-mx__table thead th small, .mk-mx__rowhead small { display: block; color: var(--ink-3); font-size: 10px; font-weight: 400; }
+.mk-mx__table .mk-mx__corner, .mk-mx__table .mk-mx__rowhead {
+  position: sticky; left: 0; z-index: 1;
+  min-width: 168px; max-width: 240px; padding: 0 10px 0 var(--sp-4);
+  background: var(--surface-2); text-align: left; font-weight: 550; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis;
+}
+.mk-mx__table thead .mk-mx__corner { z-index: 3; color: var(--ink-2); vertical-align: bottom; }
+.mk-mx__rowhead .mk-mx__name { display: block; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-sm); }
+.mk-mx__rowhead small { overflow: hidden; text-overflow: ellipsis; }
+.mk-mx__table td.mk-mx__cell { padding: 0; }
+.mk-mx__in {
+  display: block; width: 100%; min-width: 56px; height: 30px; padding: 0 6px;
+  border: 0; background: transparent; color: var(--ink);
+  font-size: var(--fs-md); text-align: right; font-variant-numeric: tabular-nums;
+}
+.mk-mx__in::placeholder { color: var(--axis); }
+.mk-mx__in:hover { background: var(--surface-2); }
+.mk-mx__in:focus { outline: none; background: var(--surface); box-shadow: inset 0 0 0 2px var(--focus); }
+.mk-mx__ro { display: block; padding: 0 6px; color: var(--ink-2); }
+.mk-mx__table .mk-mx__tot { min-width: 64px; background: var(--surface-2); font-weight: 650; border-right: 0; }
+/* footer rows: totals, then what is available, then the balance and any information rows */
+.mk-mx__table tfoot th, .mk-mx__table tfoot td { background: var(--surface-2); }
+.mk-mx__totals th, .mk-mx__totals td { border-top: 1px solid var(--axis); font-weight: 650; }
+.mk-mx__avail th, .mk-mx__avail td, .mk-mx__balance th, .mk-mx__balance td, .mk-mx__info th, .mk-mx__info td { color: var(--ink-2); font-size: var(--fs-sm); }
+.mk-mx__table tfoot .mk-mx__avail .mk-mx__rowhead, .mk-mx__table tfoot .mk-mx__balance .mk-mx__rowhead, .mk-mx__table tfoot .mk-mx__info .mk-mx__rowhead { color: var(--ink-2); font-weight: 550; }
+.mk-mx__table tfoot tr:last-child th, .mk-mx__table tfoot tr:last-child td { border-bottom: 0; }
+.mk-mx__table .is-short { background: var(--st-critical-soft); color: var(--st-critical-ink); font-weight: 650; }
+.mk-mx__table thead th.is-short { box-shadow: inset 0 -2px 0 var(--st-critical); }
+
+/* ----------------------------------------------------------------- totals */
+
+.mk-totals { display: flex; flex-direction: column; gap: 6px; min-width: 240px; font-size: var(--fs-md); }
+.mk-totals__row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-6); }
+.mk-totals__row dt { color: var(--ink-2); }
+.mk-totals__row dt small { display: block; color: var(--ink-2); font-size: var(--fs-xs); }
+.mk-totals__row dd { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.mk-totals__row.has-rule { margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--grid); }
+.mk-totals__row.is-strong dt { color: var(--ink); font-weight: 600; }
+.mk-totals__row.is-strong dd { font-size: var(--fs-lg); font-weight: 650; }
+.mk-totals__row.is-good dd { color: var(--st-good-ink); }
+.mk-totals__row.is-bad dd { color: var(--st-critical-ink); }
+.mk-totals__row.is-muted dd { color: var(--ink-2); }
+
+/* ------------------------------------------------------- links to documents */
+
+.mk-doclink { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mk-doclink--off { color: var(--ink); font-weight: 550; cursor: help; }
+
+/* ---------------------------------------------------- list of a document page */
+
+/* search and "New" are the actions of the card head; the status tabs have the row under it to themselves */
+.mk-doclist__bar { padding: 0 var(--sp-5); box-shadow: inset 0 -1px 0 var(--grid); }
+.mk-doclist__tabs { min-width: 0; }
+.mk-doclist__tabs .mk-tabs { box-shadow: none; }
+.mk-doclist__tools { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); }
+.mk-doclist > .mk-card__head { align-items: center; }
+.mk-doclist .mk-card__foot { padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
+.mk-doclist__pager { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-1); }
+.mk-doclist__count { margin-right: var(--sp-2); font-variant-numeric: tabular-nums; }
+.mk-doclist__pager.is-single .mk-btn { display: none; }
+
+/* ----------------------------------------------------------------- teaser */
+/* The locked card of the upgrade teasers: one line, no figures. Dashed, so it never reads as part of the data. */
+
+.mk-teaser {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px dashed var(--axis); border-radius: var(--radius);
+  background: var(--surface-2); color: var(--ink-2);
+}
+.mk-teaser__icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--surface-3); color: var(--ink-2); }
+.mk-teaser__main { flex: 1; min-width: 0; }
+.mk-teaser__title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); color: var(--ink); font-weight: 600; }
+.mk-teaser__tier {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 9px;
+  background: var(--accent-soft); color: var(--accent);
+  font-size: var(--fs-xs); font-weight: 650; letter-spacing: 0.02em; white-space: nowrap;
+}
+.mk-teaser__text { margin-top: 2px; font-size: var(--fs-sm); line-height: 1.45; }
+.mk-teaser__link { flex: none; font-size: var(--fs-sm); white-space: nowrap; }
+
+/* ---------------------------------------------------------- document form */
+
+.mk-docform { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.mk-docform__card { padding: var(--sp-4) var(--sp-5); }
+.mk-docform__fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); }
+.mk-span-1 { grid-column: span 1; } .mk-span-2 { grid-column: span 2; } .mk-span-3 { grid-column: span 3; } .mk-span-4 { grid-column: span 4; }
+.mk-docform__static { min-height: 34px; display: flex; align-items: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mk-docform__lines { padding: 0; overflow: hidden; }
+.mk-docform__cardhead { display: flex; align-items: baseline; gap: var(--sp-3); padding: var(--sp-3) var(--sp-5); }
+.mk-docform__cardactions { margin-left: auto; display: flex; align-items: center; gap: var(--sp-2); }
+.mk-docform__body { display: flex; flex-direction: column; gap: var(--sp-4); }
+.mk-docform__bottom { display: flex; align-items: flex-start; gap: var(--sp-4); }
+.mk-docform__panel { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
+.mk-docform__totals { flex: none; margin-left: auto; min-width: 320px; }
+.mk-docform__list { padding-left: var(--sp-4); list-style: disc; }
+.mk-docform__warn:empty, .mk-docform__error:empty { display: none; }
+.mk-docform__error { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+/* the action bar stays in reach under a long document: it floats at the bottom of the scrolling content, and the
+   warnings of the preview float with it, directly above it, so that they are in sight whenever the button is */
+.mk-docform__dock {
+  position: sticky; bottom: var(--sp-3); z-index: 2;
+  display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.mk-docform__dock > .mk-docform__warn {
+  max-height: 32vh; overflow-y: auto;
+  border-radius: var(--radius); box-shadow: var(--shadow-pop);
+}
+.mk-docform__bar {
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4) var(--sp-3) var(--sp-5);
+  border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-pop);
+}
+.mk-docform__barmain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.mk-docform__buttons { flex: none; display: flex; align-items: center; gap: var(--sp-2); margin-left: auto; }
+.mk-docform--compact .mk-docform__dock { position: static; }
+.mk-docform--compact .mk-docform__dock > .mk-docform__warn { max-height: none; box-shadow: none; }
+.mk-docform--compact .mk-docform__bar { padding: var(--sp-3) 0 0; border-radius: 0; background: transparent; box-shadow: inset 0 1px 0 var(--grid); }
+
+@media (max-width: 1180px) {
+  .mk-docform__fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mk-span-3, .mk-span-4 { grid-column: span 2; }
+  .mk-docform__bottom { flex-direction: column; align-items: stretch; }
+  .mk-docform__totals { margin-left: 0; }
+}
+
+/* ---------------------------------------------------------- document view */
+
+.mk-docview { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.mk-docview__grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--sp-4); align-items: start; }
+.mk-docview--single .mk-docview__grid, .mk-docview--compact .mk-docview__grid { grid-template-columns: minmax(0, 1fr); }
+.mk-docview__main, .mk-docview__side { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.mk-docview__totals { display: flex; justify-content: flex-end; padding: var(--sp-4) var(--sp-5); border-top: 1px solid var(--grid); }
+.mk-docview__lines .mk-card__body--flush > .mk-table-wrap:last-child { border-radius: 0; }
+
+.mk-docacts { display: flex; flex-direction: column; gap: var(--sp-3); }
+.mk-docact { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mk-docact__why { display: flex; align-items: flex-start; gap: 5px; color: var(--ink-2); font-size: var(--fs-sm); line-height: 1.4; }
+.mk-docact__why svg { flex: none; margin-top: 3px; color: var(--ink-3); }
+
+.mk-related { display: flex; flex-direction: column; gap: var(--sp-3); }
+.mk-related__line { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); flex-wrap: wrap; }
+.mk-related__note { margin-top: 2px; color: var(--ink-2); font-size: var(--fs-sm); }
+
+@media (max-width: 1180px) {
+  .mk-docview__grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* -------------------------------------------------------------- paper form */
+/* What printSheet() builds. These rules also draw it on screen (a print preview in a modal); css/print.css adds
+   the page breaks. Ink on paper: no card, no shadow, hairlines only. */
+
+.mk-print { display: none; } /* the print-only host of printDoc(); css/print.css shows it while printing */
+
+.mk-print-doc { display: flex; flex-direction: column; gap: var(--sp-4); color: var(--ink); font-size: var(--fs-sm); line-height: 1.45; }
+.mk-print-head { display: flex; justify-content: space-between; gap: var(--sp-6); padding-bottom: var(--sp-3); border-bottom: 2px solid var(--ink); }
+.mk-print-seller__name { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.01em; }
+.mk-print-title { text-align: right; }
+.mk-print-title__name { font-size: var(--fs-lg); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.mk-print-title__no { font-weight: 650; font-variant-numeric: tabular-nums; }
+.mk-print-title__copy { color: var(--ink-2); }
+.mk-print-parties { display: flex; justify-content: space-between; gap: var(--sp-6); }
+.mk-print-label { color: var(--ink-2); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.mk-print-party__name { font-weight: 650; font-size: var(--fs-md); }
+.mk-print-meta { display: grid; grid-template-columns: max-content max-content; gap: 2px var(--sp-4); align-content: start; }
+.mk-print-meta > div { display: contents; }
+.mk-print-meta dt { color: var(--ink-2); }
+.mk-print-meta dd { text-align: right; font-variant-numeric: tabular-nums; }
+.mk-print-table { width: 100%; border-collapse: collapse; }
+.mk-print-table th { padding: 6px 8px; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); font-weight: 650; text-align: left; }
+.mk-print-table td { padding: 5px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+.mk-print-table tfoot td { border-top: 1px solid var(--ink); border-bottom: 0; font-weight: 650; }
+.mk-print-table .is-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mk-print-table .is-center { text-align: center; }
+.mk-print-end { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-6); }
+.mk-print-notes { flex: 1; min-width: 0; color: var(--ink-2); }
+.mk-print-totals { flex: none; min-width: 260px; padding: var(--sp-3) 0 0; }
+.mk-print-totals .mk-totals__row.has-rule { border-top-color: var(--ink); }
+.mk-print-sign { display: flex; justify-content: space-between; gap: var(--sp-6); margin-top: var(--sp-8); }
+.mk-print-sign__box { width: 220px; text-align: center; color: var(--ink-2); }
+.mk-print-sign__line { height: 44px; border-bottom: 1px solid var(--ink); margin-bottom: 4px; }

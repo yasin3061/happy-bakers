@@ -1,0 +1,28 @@
+/* guide: page styles. Every selector under .pg-guide; colours as var(--token) only. */
+
+/* The steps of a journey: a mark, the text with who and when, and the two ways on (switch persona, open the screen). */
+.pg-guide .pg-guide__steps { list-style: none; margin: 0; padding: 0; }
+.pg-guide .pg-guide__step {
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: var(--sp-3); align-items: start;
+  padding: var(--sp-3) 0; border-top: 1px solid var(--grid);
+}
+.pg-guide .pg-guide__step:first-child { border-top: 0; padding-top: 0; }
+.pg-guide .pg-guide__step:last-child { padding-bottom: 0; }
+
+.pg-guide .pg-guide__mark {
+  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--surface-3); color: var(--ink-2); font-size: var(--fs-sm); font-weight: 600;
+}
+.pg-guide .pg-guide__step.is-next .pg-guide__mark { background: var(--accent-soft); color: var(--accent); }
+.pg-guide .pg-guide__step.is-done .pg-guide__mark { background: var(--st-good-soft); color: var(--st-good-ink); }
+
+.pg-guide .pg-guide__main { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; line-height: 1.45; }
+.pg-guide .pg-guide__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.pg-guide .pg-guide__acts { display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-2); white-space: nowrap; }
+
+/* "Then look at": the links under a journey, on one wrapping line. */
+.pg-guide .pg-guide__then { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-5); }
+
+/* A screen the persona in use does not have: named, with a lock, not a link. */
+.pg-guide .pg-guide__locked { display: inline-flex; align-items: center; gap: var(--sp-1); cursor: help; }
+.pg-guide .pg-guide__fresh { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); }

@@ -1,0 +1,9 @@
+/* home: page styles. Every selector under .pg-home; colours as var(--token) only. */
+
+/* The cards stand two abreast on a wide screen and one under the other from 1400px down, so no table is squeezed. */
+@media (max-width: 1400px) {
+  .pg-home .pg-home__grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Today's work: the button of a row keeps to one line beside its text. */
+.pg-home .pg-home__work td:last-child { white-space: nowrap; width: 1%; }

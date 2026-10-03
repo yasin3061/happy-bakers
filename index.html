@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow"> <!-- a sample on invented data: not for search engines -->
+  <title>Happy Bakers - Neo ERP sample</title>
+  <link rel="icon" href="data:,"> <!-- no image assets in the sample; this also stops the favicon request -->
+
+  <!-- Stylesheets: load order fixed by docs/SPEC.md section 3 -->
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/charts.css">
+  <link rel="stylesheet" href="css/forms.css">
+  <link rel="stylesheet" href="css/print.css">
+  <!-- One optional stylesheet per page (docs/SPEC.md section 9), listed from the start so page authors never edit this
+       file. A page that needs no rules of its own has no file; the browser notes the miss and carries on. -->
+  <link rel="stylesheet" href="css/pages/p-home.css">
+  <link rel="stylesheet" href="css/pages/p-approvals.css">
+  <link rel="stylesheet" href="css/pages/p-guide.css">
+  <link rel="stylesheet" href="css/pages/p-sell-dispatch.css">
+  <link rel="stylesheet" href="css/pages/p-sell-corporate.css">
+  <link rel="stylesheet" href="css/pages/p-sell-invoices.css">
+  <link rel="stylesheet" href="css/pages/p-sell-returns.css">
+  <link rel="stylesheet" href="css/pages/p-sell-receipts.css">
+  <link rel="stylesheet" href="css/pages/p-stores-transfers.css">
+  <link rel="stylesheet" href="css/pages/p-stores-dayend.css">
+  <link rel="stylesheet" href="css/pages/p-buy-orders.css">
+  <link rel="stylesheet" href="css/pages/p-buy-receipts.css">
+  <link rel="stylesheet" href="css/pages/p-buy-bills.css">
+  <link rel="stylesheet" href="css/pages/p-buy-payments.css">
+  <link rel="stylesheet" href="css/pages/p-make-production.css">
+  <link rel="stylesheet" href="css/pages/p-make-recipes.css">
+  <link rel="stylesheet" href="css/pages/p-stock-onhand.css">
+  <link rel="stylesheet" href="css/pages/p-stock-batches.css">
+  <link rel="stylesheet" href="css/pages/p-stock-ledger.css">
+  <link rel="stylesheet" href="css/pages/p-stock-counts.css">
+  <link rel="stylesheet" href="css/pages/p-expenses.css">
+  <link rel="stylesheet" href="css/pages/p-people.css">
+  <link rel="stylesheet" href="css/pages/p-acc-receivables.css">
+  <link rel="stylesheet" href="css/pages/p-acc-payables.css">
+  <link rel="stylesheet" href="css/pages/p-acc-cash.css">
+  <link rel="stylesheet" href="css/pages/p-acc-pnl.css">
+  <link rel="stylesheet" href="css/pages/p-acc-margin.css">
+  <link rel="stylesheet" href="css/pages/p-acc-gst.css">
+  <link rel="stylesheet" href="css/pages/p-reports.css">
+  <link rel="stylesheet" href="css/pages/p-masters-items.css">
+  <link rel="stylesheet" href="css/pages/p-masters-parties.css">
+  <link rel="stylesheet" href="css/pages/p-masters-setup.css">
+  <link rel="stylesheet" href="css/pages/p-sys-audit.css">
+  <link rel="stylesheet" href="css/pages/p-sys-notifications.css">
+  <link rel="stylesheet" href="css/pages/p-sys-tiers.css">
+  <link rel="stylesheet" href="css/pages/p-sys-about.css">
+</head>
+<body>
+  <a class="mk-skip" href="#mk-content">Skip to content</a>
+
+  <div id="mk-app" class="mk-app">
+    <aside id="mk-sidebar" class="mk-sidebar" aria-label="Primary navigation"></aside>
+
+    <div class="mk-main">
+      <div id="mk-banner" class="mk-banner" role="status" hidden></div>
+      <header id="mk-topbar" class="mk-topbar"></header>
+      <div id="mk-filterbar" class="mk-filterbar" hidden></div>
+      <main id="mk-content" class="mk-content" tabindex="-1">
+        <div id="mk-page" class="mk-page"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Drawers, modals, popovers, type-ahead lists and toasts are appended here by HB.ui and HB.forms -->
+  <div id="mk-overlays" class="mk-overlays"></div>
+
+  <noscript>
+    <p class="mk-noscript">This sample needs JavaScript. Enable it in the browser and reload the page.</p>
+  </noscript>
+
+  <!-- Scripts: classic tags only, load order fixed by docs/SPEC.md section 3. Every file tolerates the ones before it
+       being absent, so a missing data or page file leaves the shell working. -->
+  <script src="vendor/echarts.min.js"></script>
+  <script src="js/core/kernel.js"></script>
+
+  <script src="js/data/config.js"></script>
+  <script src="js/data/engine.js"></script>
+  <script src="js/data/seed.js"></script>
+  <script src="js/data/data.js"></script>
+
+  <script src="js/core/ui.js"></script>
+  <script src="js/core/charts.js"></script>
+  <script src="js/core/forms.js"></script>
+  <script src="js/core/filters.js"></script>
+  <script src="js/core/router.js"></script>
+
+  <!-- Pages, in the order of docs/SPEC.md section 9 (the menu order inside a group is this order) -->
+  <script src="js/pages/home.js"></script>
+  <script src="js/pages/approvals.js"></script>
+  <script src="js/pages/guide.js"></script>
+  <script src="js/pages/sell-dispatch.js"></script>
+  <script src="js/pages/sell-corporate.js"></script>
+  <script src="js/pages/sell-invoices.js"></script>
+  <script src="js/pages/sell-returns.js"></script>
+  <script src="js/pages/sell-receipts.js"></script>
+  <script src="js/pages/stores-transfers.js"></script>
+  <script src="js/pages/stores-dayend.js"></script>
+  <script src="js/pages/buy-orders.js"></script>
+  <script src="js/pages/buy-receipts.js"></script>
+  <script src="js/pages/buy-bills.js"></script>
+  <script src="js/pages/buy-payments.js"></script>
+  <script src="js/pages/make-production.js"></script>
+  <script src="js/pages/make-recipes.js"></script>
+  <script src="js/pages/stock-onhand.js"></script>
+  <script src="js/pages/stock-batches.js"></script>
+  <script src="js/pages/stock-ledger.js"></script>
+  <script src="js/pages/stock-counts.js"></script>
+  <script src="js/pages/expenses.js"></script>
+  <script src="js/pages/people.js"></script>
+  <script src="js/pages/acc-receivables.js"></script>
+  <script src="js/pages/acc-payables.js"></script>
+  <script src="js/pages/acc-cash.js"></script>
+  <script src="js/pages/acc-pnl.js"></script>
+  <script src="js/pages/acc-margin.js"></script>
+  <script src="js/pages/acc-gst.js"></script>
+  <script src="js/pages/reports.js"></script>
+  <script src="js/pages/masters-items.js"></script>
+  <script src="js/pages/masters-parties.js"></script>
+  <script src="js/pages/masters-setup.js"></script>
+  <script src="js/pages/sys-audit.js"></script>
+  <script src="js/pages/sys-notifications.js"></script>
+  <script src="js/pages/sys-tiers.js"></script>
+  <script src="js/pages/sys-about.js"></script>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

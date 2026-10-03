@@ -1,0 +1,10 @@
+/* approvals: page styles. Every selector under .pg-approvals; colours as var(--token) only. */
+
+/* The document opened from Today's work stands out from the rest of the queue. */
+.pg-approvals .pg-approvals__item.is-focus { box-shadow: 0 0 0 2px var(--accent); }
+
+/* The reason beside a locked button: the lock and the words on one line. */
+.pg-approvals .pg-approvals__why { display: inline-flex; align-items: center; gap: var(--sp-1); }
+
+/* The difference of a line of the three-way check, with its verdict under it. */
+.pg-approvals .pg-approvals__diff { display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-1); }

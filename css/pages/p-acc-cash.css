@@ -1,0 +1,4 @@
+/* acc-cash: a balance is shown to the paisa, so its tile is wider than the kit's smallest. Every selector under
+   .pg-acc-cash; colours as var(--token) only. */
+
+.pg-acc-cash .cash-tiles { grid-template-columns: repeat(auto-fit, minmax(212px, 1fr)); }

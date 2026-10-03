@@ -1,0 +1,16 @@
+{
+  "name": "happy-bakers-neo-erp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Happy Bakers - Neo ERP (Tier 1) sales sample: a browser-only ERP on seeded data, served as a static site",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node tools/serve.js",
+    "check": "node tools/check.js",
+    "check:config": "node tools/check-config.js",
+    "check:all": "node tools/check-config.js && node tools/check.js"
+  }
+}

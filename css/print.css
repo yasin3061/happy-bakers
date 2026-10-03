@@ -1,0 +1,59 @@
+/*
+ * Print. Two cases, both on plain paper with no shell:
+ *  1. HB.forms.printDoc(node) puts a copy of one document in #mk-print and sets html.mk-printing: only that copy is
+ *     printed - an invoice or a delivery challan, flowing over as many pages as it needs.
+ *  2. The browser's own Print on any screen: the sidebar, the bars and the buttons go, the page content flows.
+ * Colours only through css/tokens.css; backgrounds are dropped so nothing depends on "print background graphics".
+ */
+
+@media print {
+  @page { size: A4; margin: 14mm 12mm 16mm; }
+
+  /* the shell is a fixed-height, scroll-inside layout on screen: on paper everything must flow */
+  html, body { height: auto !important; overflow: visible !important; background: none !important; }
+  body { font-size: 11pt; color: var(--ink); }
+  .mk-app, .mk-main { display: block !important; height: auto !important; }
+  .mk-content { overflow: visible !important; height: auto !important; scrollbar-gutter: auto; }
+  .mk-page { max-width: none; padding: 0; }
+
+  /* what belongs to the screen only */
+  .mk-skip, .mk-sidebar, .mk-topbar, .mk-filterbar, .mk-banner, .mk-overlays, .mk-noscript,
+  .mk-btn, .mk-tabs, .mk-search, .mk-seg, .mk-pagehead__back, .mk-pagehead__actions,
+  .mk-docform__bar, .mk-lg__bar, .mk-lg__x, .mk-doclist__bar, .mk-doclist__pager,
+  .mk-docview__actions, .mk-docact__why, .mk-teaser, .mk-chart__tools { display: none !important; }
+
+  /* cards become plain blocks with a hairline; a long table inside one may run over pages */
+  .mk-card, .mk-tile { box-shadow: none; border: 1px solid var(--axis); background: none; }
+  .mk-docview__grid { display: block; }
+  .mk-docview__main, .mk-docview__side { display: block; }
+  .mk-docview__main > *, .mk-docview__side > * { margin-bottom: 10pt; }
+  .mk-table-wrap, .mk-lg__scroll, .mk-mx__scroll { overflow: visible !important; max-height: none !important; }
+  .mk-table th, .mk-table tfoot td, .mk-mx__table thead th, .mk-mx__table .mk-mx__rowhead, .mk-mx__table .mk-mx__corner { position: static; }
+  .mk-chip { background: none; box-shadow: inset 0 0 0 1px var(--axis); color: var(--ink); }
+
+  /* a table header repeats on every page; a row, a totals block and a document head never split */
+  thead { display: table-header-group; }
+  tfoot { display: table-row-group; } /* the total comes once, after the last line, not at the foot of every page */
+  tr, .mk-totals, .mk-docview__totals, .mk-pagehead, .mk-kv, .mk-tl, .mk-callout { break-inside: avoid; page-break-inside: avoid; }
+  h1, h2, h3, .mk-card__head, .mk-pagehead { break-after: avoid; page-break-after: avoid; }
+
+  /* ------------------------------------------------ printDoc(): one document */
+
+  html.mk-printing body > *:not(.mk-print) { display: none !important; }
+  html.mk-printing .mk-print { display: block !important; }
+
+  /* blocks, not the flex column of the screen: a plain block flow is what breaks across pages as written below */
+  .mk-print-doc { display: block; font-size: 10pt; }
+  .mk-print-doc > * + * { margin-top: 12pt; }
+  .mk-print-head, .mk-print-parties, .mk-print-end, .mk-print-totals, .mk-print-sign { break-inside: avoid; page-break-inside: avoid; }
+  .mk-print-head, .mk-print-parties { break-after: avoid; page-break-after: avoid; }
+  .mk-print-table tr { break-inside: avoid; page-break-inside: avoid; }
+  /* the last lines stay with what follows them: no page carries the totals, the notes or the signatures alone */
+  .mk-print-table tbody tr:nth-last-child(-n+2), .mk-print-table tfoot tr, .mk-print-table { break-after: avoid; page-break-after: avoid; }
+  .mk-print-end, .mk-print-sign { break-before: avoid; page-break-before: avoid; }
+  .mk-print-doc > .mk-print-sign { margin-top: 28pt; }
+  .mk-print-sign__box { width: auto; min-width: 220px; max-width: 46%; } /* a long legal name signs on one line */
+  .mk-print-seller__name { font-size: 15pt; }
+  .mk-print-title__name { font-size: 12pt; }
+  a { color: inherit; text-decoration: none; }
+}
