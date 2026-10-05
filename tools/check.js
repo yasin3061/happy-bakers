@@ -2192,6 +2192,186 @@ function reconcile(label, ranges) {
     b.pnl.reduce(function (s, x) { return s + (x.line === 'prodLoss' ? x.amount : 0); }, 0), (sw.returns || {}).taxable || 0, S.sell.summary(whole).net, b.moves.length]);
 }
 
+/* ----- the dashboard of a range */
+
+/**
+ * What dash.period must hold for a range, as the Owner, without a selector: sales by channel, spend by location and
+ * production by product from the documents alone (straightFlows: a cancelled document once more as its negative on
+ * the date of its cancellation); collections from the raw rows of the cash ledger, cash apart from the bank, and
+ * once more from the documents.
+ */
+function straightPeriod(from, to) {
+  var w = straightFlows(from, to), out = { sales: {}, total: { gross: 0, returns: 0, net: 0, units: 0 }, collections: { total: 0, cash: 0, bank: 0 },
+    spend: {}, spendTotal: 0, production: {}, made: { runs: 0, expectedUnits: 0, goodUnits: 0, rejectedUnits: 0, lossValue: 0 } };
+  Object.keys(w.sales || {}).forEach(function (ch) {
+    var c = w.sales[ch], gross = c.sales || 0, returns = c.returns || 0, units = c.units || 0;
+    out.sales[ch] = { gross: gross, returns: returns, net: gross + returns, units: units };
+    out.total.gross += gross; out.total.returns += returns; out.total.net += gross + returns; out.total.units += units;
+  });
+  HB.book.cash.entries.forEach(function (e) {
+    if (e.date < from || e.date > to || (e.kind !== 'collected' && e.kind !== 'receipt')) return;
+    out.collections.total += e.amount;
+    out.collections[e.accountId === 'bank' ? 'bank' : 'cash'] += e.amount;
+  });
+  out.collectedByDocuments = w.collections || 0;
+  Object.keys(w.expenses || {}).forEach(function (k) { addTo(out.spend, k.split('|')[1], w.expenses[k]); out.spendTotal += w.expenses[k]; });
+  Object.keys(w.production || {}).forEach(function (id) {
+    var p = w.production[id], row = { runs: p.runs || 0, expectedUnits: p.expected || 0, goodUnits: p.good || 0, rejectedUnits: p.rejected || 0, lossValue: p.loss || 0 };
+    out.production[id] = row;
+    Object.keys(row).forEach(function (k) { out.made[k] += row[k]; });
+  });
+  out.made['yield'] = out.made.expectedUnits ? out.made.goodUnits / out.made.expectedUnits : null;
+  return plain(prune(out)) || {};
+}
+
+/** The same figures as dash.period returns them. */
+function selectedPeriod(from, to) {
+  var p = HB.data.dash.period({ from: from, to: to }), m = p.production, out = { sales: {}, spend: {}, production: {} };
+  p.sales.byChannel.forEach(function (x) { out.sales[x.channel] = { gross: x.gross, returns: x.returns, net: x.net, units: x.units }; });
+  out.total = { gross: p.sales.gross, returns: p.sales.returns, net: p.sales.net, units: p.sales.units };
+  out.collections = p.collections;
+  out.collectedByDocuments = p.collections.total;
+  p.spend.byUnit.forEach(function (x) { out.spend[x.unitId] = x.amount; });
+  out.spendTotal = p.spend.total;
+  m.byItem.forEach(function (x) { out.production[x.itemId] = { runs: x.runs, expectedUnits: x.expectedUnits, goodUnits: x.goodUnits, rejectedUnits: x.rejectedUnits, lossValue: x.lossValue }; });
+  out.made = { runs: m.runs, expectedUnits: m.expectedUnits, goodUnits: m.goodUnits, rejectedUnits: m.rejectedUnits, lossValue: m.lossValue, 'yield': m['yield'] };
+  return plain(prune(out)) || {};
+}
+
+/** The fields of a dashboard result and of each of its blocks, in order: its shape. */
+function dashShape(d) {
+  var out = { fields: Object.keys(d) };
+  d.blocks.forEach(function (id) { out[id] = Object.keys(d[id]); });
+  return out;
+}
+
+/* ----- the cockpit of the dashboard: the points of a range and what a result holds beside its blocks */
+
+/** The days of a range, or its months when it has more than 62 days: what the small charts of the dashboard stand on. */
+function straightAxis(from, to) {
+  var D = HB.dates, today = HB.calendar.today, n = D.diffDays(from, to) + 1, out = [], d, end;
+  if (n <= 62) {
+    for (d = from; d <= to; d = D.addDays(d, 1)) out.push({ key: d, label: D.label(d, 'd MMM'), from: d, to: d, whole: d < today });
+  } else {
+    /* month by month: a month holds its days inside the range, and is whole when it holds them all and is over */
+    for (d = from; d <= to; d = D.addDays(end, 1)) {
+      end = D.monthEnd(d);
+      out.push({ key: d.slice(0, 7), label: D.monthLabel(d.slice(0, 7), true), from: d, to: end > to ? to : end, whole: d.slice(8) === '01' && end <= to && end < today });
+    }
+  }
+  return { days: n, grain: n <= 62 ? 'day' : 'month', points: out };
+}
+
+/** a / b as dash.period gives a share: null when there is nothing to divide by. */
+function share(a, b) { return b ? a / b : null; }
+
+/**
+ * What dash.period must hold beside its blocks for a range, as the Owner, without a selector.
+ * The points: from the raw rows of the P&L ledger and of the cash ledger by their own dates, and the good units from
+ * the production entries (a cancelled one once more as its negative on the date of its cancellation). A figure is
+ * null where the point has no row of its kind. The balance of a point is every cash row dated up to its last day.
+ * The facts beside them: the open days from the same rows; the leading channel and route, the margin, the returns and
+ * the spend from the documents alone (postings, straightFlows).
+ */
+function straightCockpit(from, to) {
+  var b = HB.book, M = HB.masters, axis = straightAxis(from, to), days = {}, COST = { cogs: 1, prodLoss: 1, writeoff: 1, countDiff: 1 };
+  function dayOf(date) { return days[date] || (days[date] = {}); }
+  function put(date, k, n) { if (date >= from && date <= to) dayOf(date)[k] = (dayOf(date)[k] || 0) + n; }
+  b.pnl.forEach(function (x) {
+    if (x.line === 'sales') { put(x.date, 'gross', x.amount); put(x.date, 'net', x.amount); if (x.channel !== 'store') put(x.date, 'supplied', x.amount); }
+    else if (x.line === 'returns') { put(x.date, 'net', x.amount); if (x.channel !== 'store') put(x.date, 'returned', -x.amount); }
+    else if (COST[x.line]) put(x.date, 'cost', x.amount);
+  });
+  b.cash.entries.forEach(function (x) { if (x.kind === 'collected' || x.kind === 'receipt') put(x.date, 'collected', x.amount); });
+  b.byType.PROD.forEach(function (d) {
+    put(d.date, 'good', d.goodUnits);
+    if (d.cancelled) put(b.docs[d.cancelled.docId].date, 'good', -d.goodUnits);
+  });
+  var dates = Object.keys(days).sort();
+  function sum(p, k) {
+    var t = null;
+    dates.forEach(function (date) { if (date >= p.from && date <= p.to && days[date][k] !== undefined) t = (t || 0) + days[date][k]; });
+    return t;
+  }
+  var points = axis.points.map(function (p) {
+    var net = sum(p, 'net'), cost = sum(p, 'cost'), supplied = sum(p, 'supplied'), returned = sum(p, 'returned');
+    return {
+      key: p.key, label: p.label, from: p.from, to: p.to, whole: p.whole,
+      netSales: net, collected: sum(p, 'collected'), materialCost: cost, marginPct: net === null ? null : share(net - (cost || 0), net),
+      goodUnits: sum(p, 'good'), supplied: supplied, returned: returned, returnShare: share(returned || 0, supplied),
+      cashBalance: b.cash.entries.reduce(function (s, x) { return s + (x.date <= p.to ? x.amount : 0); }, 0)
+    };
+  });
+
+  /* the open days: a day on which something was sold. The best and the slowest of them, the earlier of two that tie */
+  var open = 0, best = null, slowest = null, total = 0;
+  dates.forEach(function (date) {
+    var d = days[date];
+    total += d.net || 0;
+    if (!(d.gross > 0)) return;
+    open++;
+    if (!best || d.net > best.net) best = { date: date, net: d.net };
+    if (!slowest || d.net < slowest.net) slowest = { date: date, net: d.net };
+  });
+
+  /* from the documents: who leads, what the goods cost, what came back, what was spent */
+  var w = straightFlows(from, to), LABEL = { retail: 'Retail outlets', corporate: 'Corporates', store: 'Own stores' };
+  var net = 0, channel = null, routes = {}, route = null, cost = { cogs: 0, prodLoss: 0, writeoff: 0, countDiff: 0 }, supplied = 0, returned = 0;
+  ['retail', 'corporate', 'store'].forEach(function (ch) { var c = (w.sales || {})[ch] || {}; net += (c.sales || 0) + (c.returns || 0); });
+  ['retail', 'corporate', 'store'].forEach(function (ch) {
+    var c = (w.sales || {})[ch] || {}, n = (c.sales || 0) + (c.returns || 0);
+    if (n > 0 && (!channel || n > channel.net)) channel = { channel: ch, label: LABEL[ch], net: n, share: share(n, net) };
+  });
+  postings().forEach(function (p) {
+    if (p.date < from || p.date > to) return;
+    var d = p.doc, s = p.sign;
+    if (d.type === 'INV' && !d.opening) { cost.cogs += s * d.cost; supplied += s * d.taxable; if (d.routeId) addTo(routes, d.routeId, s * d.taxable); }
+    else if (d.type === 'DAYEND') cost.cogs += s * d.cost;
+    else if (d.type === 'CN') { returned += s * d.taxable; if (M.customerById[d.customerId].routeId) addTo(routes, M.customerById[d.customerId].routeId, -s * d.taxable); }
+    else if (d.type === 'PROD') cost.prodLoss += s * d.lossValue;
+    else if (d.type === 'WO') cost.writeoff += s * d.value;
+    else if (d.type === 'ADJ') cost.countDiff -= s * d.value;
+  });
+  M.routes.forEach(function (r) { if (routes[r.id] > 0 && (!route || routes[r.id] > route.net)) route = { routeId: r.id, label: r.name, net: routes[r.id], share: share(routes[r.id], net) }; });
+  var material = cost.cogs + cost.prodLoss + cost.writeoff + cost.countDiff, limit = M.limits.returnsPct;
+  var byUnit = {}, byCat = {}, spent = 0;
+  Object.keys(w.expenses || {}).forEach(function (k) { addTo(byCat, k.split('|')[0], w.expenses[k]); addTo(byUnit, k.split('|')[1], w.expenses[k]); spent += w.expenses[k]; });
+  var cats = M.expenseCategories.filter(function (k) { return byCat[k.id]; }).map(function (k) { return { categoryId: k.id, categoryName: k.name, amount: byCat[k.id], share: share(byCat[k.id], spent) }; })
+    .sort(function (x, z) { return z.amount - x.amount; });
+
+  return plain({
+    days: axis.days, grain: axis.grain, points: points,
+    salesFacts: { openDays: open, average: open ? Math.round(total / open) : null, best: best, slowest: slowest, channel: channel, route: route },
+    margin: { netSales: net, cogs: cost.cogs, prodLoss: cost.prodLoss, writeoff: cost.writeoff, countDiff: cost.countDiff, materialCost: material,
+      grossMargin: net - material, grossMarginPct: share(net - material, net), materialPct: share(material, net) },
+    returns: { supplied: supplied, returned: returned, share: share(returned, supplied), limitPct: limit, over: supplied > 0 && returned * 100 > limit * supplied },
+    spendFacts: {
+      byLocation: M.units.map(function (u) { return { unitId: u.id, unitName: u.name, amount: byUnit[u.id] || 0, share: share(byUnit[u.id] || 0, spent) }; }),
+      byCategory: cats, largest: cats.length && cats[0].amount > 0 ? cats[0] : null
+    }
+  });
+}
+
+/** The same, as dash.period returns it. */
+function selectedCockpit(from, to) {
+  var p = HB.data.dash.period({ from: from, to: to });
+  return plain({ days: p.days, grain: p.grain, points: p.points, salesFacts: p.salesFacts, margin: p.margin, returns: p.returns, spendFacts: p.spendFacts });
+}
+
+/** What is open by age, from the open amounts of straightBalances and the due dates of the documents: the five buckets, each with its share. */
+function straightBuckets(open, pick) {
+  var today = HB.calendar.today, t = { notDue: 0, d1_15: 0, d16_30: 0, d31_60: 0, d60p: 0 }, total = 0;
+  Object.keys(open || {}).forEach(function (id) {
+    var d = HB.book.docs[id], n = d.dueDate < today ? HB.dates.diffDays(d.dueDate, today) : 0;
+    if (!pick(d)) return;
+    t[n <= 0 ? 'notDue' : (n <= 15 ? 'd1_15' : (n <= 30 ? 'd16_30' : (n <= 60 ? 'd31_60' : 'd60p')))] += open[id];
+    total += open[id];
+  });
+  return [['notDue', 'Not due'], ['d1_15', '1 - 15 days'], ['d16_30', '16 - 30 days'], ['d31_60', '31 - 60 days'], ['d60p', 'Over 60 days']].map(function (k) {
+    return { key: k[0], label: k[1], amount: t[k[0]], share: share(t[k[0]], total) };
+  });
+}
+
 /** One call of every selector, by name: for the sweeps by role. */
 function everySelector() {
   var S = HB.data, f = { from: HB.calendar.goLive, to: HB.calendar.today }, out = {};
@@ -2219,7 +2399,7 @@ function everySelector() {
   out['exp.list'] = S.exp.list(f); out['exp.byCategory'] = S.exp.byCategory(f); out['exp.byUnit'] = S.exp.byUnit(f);
   out['people.list'] = S.people.list(); out['people.headcount'] = S.people.headcount();
   out['approvals.pending'] = S.approvals.pending(); out['audit.list'] = S.audit.list(f); out['notify.list'] = S.notify.list();
-  out['dash.today'] = S.dash.today(); out['dash.monthToDate'] = S.dash.monthToDate(); out['dash.work'] = S.dash.work(); out['guide.journeys'] = S.guide.journeys();
+  out['dash.today'] = S.dash.today(); out['dash.period'] = S.dash.period(f); out['dash.monthToDate'] = S.dash.monthToDate(); out['dash.work'] = S.dash.work(); out['guide.journeys'] = S.guide.journeys();
   HB.book.docList.forEach(function (d) { out['doc ' + d.id] = [S.doc.get(d.id), S.doc.view(d.id), S.doc.timeline(d.id), S.doc.related(d.id)]; });
   out['reports.list'] = S.reports.list();
   ['sales_register', 'sales_by_item', 'sales_by_customer', 'sales_by_route', 'sales_by_channel', 'returns', 'production_register', 'stock_statement', 'stock_ledger', 'expiry', 'purchase_register', 'order_status',
@@ -2572,7 +2752,7 @@ function partS() {
       store_mgr: 'XFER-U-0001 DAYEND-U-0001 WO-U-0001 EXP-U-0001 PAY-U-0002 DEP-U-0002 EXP-U-0005 XFER-U-0002'
     };
     /* the dashboard, the guide and the lookups answer to everybody; the rest only to a role that has a page for it */
-    var forAll = { 'dash.today': 1, 'dash.monthToDate': 1, 'dash.work': 1, 'guide.journeys': 1, lookup: 1 };
+    var forAll = { 'dash.today': 1, 'dash.period': 1, 'dash.monthToDate': 1, 'dash.work': 1, 'guide.journeys': 1, lookup: 1 };
     eq('the selectors that return anything, role by role', ['stores', 'production', 'sales', 'store_mgr'].map(function (role) {
       as(role);
       all = everySelector();
@@ -2950,6 +3130,351 @@ function partS() {
     book = HB.book;
     eq('on 2 May: nobody can, March being locked', [repost('sales'), repost('owner')],
       [0, 1].map(function () { return { ok: false, code: 'locked_month', reason: 'Mar 2026 is a locked month: entries can be dated from 1 Apr 2026', owner: false }; }));
+    HB.calendar.set(T);
+    as('owner');
+    E.boot();
+    book = HB.book;
+  });
+
+  /*
+   * s.8: the dashboard of a range (dash.period), on a new copy of the tiny company: the 35 operations of part (a) on
+   * 10 Mar, then February, an open month, filled by four back-dated entries, then cancellations and a production run
+   * on the next business date. The arithmetic of 9 and 10 Mar is in a.3 to a.9; what is new is worked out below.
+   */
+  section('s.8 the dashboard of a range: dash.period against a straight sum, the month to date, a whole month against the P&L, by role', function () {
+    var FEB = ['2026-02-01', '2026-02-28'], JAN = [GO, '2026-01-31'], SPAN = ['2026-02-20', T], MTD = ['2026-03-01', T1], LIFE = [GO, T1];
+    var BALANCES = ['cash', 'receivables', 'payables', 'approvals', 'lowStock', 'nearExpiry'], ROLES = ['owner', 'accounts', 'stores', 'production', 'sales', 'store_mgr'];
+    function period(rg) { return S.dash.period({ from: rg[0], to: rg[1] }); }
+    HB.store.remove('log');
+    HB.calendar.set(T);
+    as('owner');
+    E.boot();
+    x = handWorked();
+    /* 36. the Owner back-dates an invoice to 20 Feb for the weekly outlet: 4 loaves x 3200 = 12800
+       37. accounts back-dates a receipt of 5000 from that outlet to 24 Feb, into the bank, on account
+       38. the Owner back-dates a puff run to 25 Feb: 1 mix, 100 expected, 96 good, 4 rejected: loss 4 x 482 = 1928 (a.3: a puff costs 482)
+       39, 40. accounts back-dates an electricity bill for the store to 26 Feb, 40000 before GST, and the Owner approves it:
+       with the salary bill of February (a.8: factory 9300000, store 1600000) the month spent 9300000 and 1640000 */
+    ok('36 an invoice of 20 Feb', post('owner', 'INV', { date: '2026-02-20', customerId: 'c_week', lines: [{ itemId: 'bread', qty: 4 }] }));
+    ok('37 a receipt of 24 Feb', post('accounts', 'RCPT', { date: '2026-02-24', customerId: 'c_week', account: 'bank', amount: 5000 }));
+    ok('38 a puff run of 25 Feb', post('owner', 'PROD', { date: '2026-02-25', itemId: 'puff', mixes: 1, goodUnits: 96, rejectedUnits: 4 }));
+    r = ok('39 an electricity bill of 26 Feb for the store', post('accounts', 'EXP', { kind: 'bill', date: '2026-02-26', payeeId: 'v_power', categoryId: 'electricity', unitId: 'st_vvn', amount: 40000, gstRate: 18, billRef: 'MG/5390' }));
+    ok('40 approve it', act('owner', 'approve', { id: r.doc.id }));
+
+    /* ----- the next business date: 41. the sheet invoice of the weekly outlet is cancelled (its 118000 of 10 Mar stay, the
+       negative is dated 11 Mar); 42. so is the electricity bill of 10 Mar (1000000); 43. puffs, 1 mix, 95 good, 5 rejected:
+       loss 5 x 482 = 2410; 44, 45. a bread run entered and cancelled; 46. 10000 received in cash on account */
+    HB.calendar.set(T1);
+    E.boot();
+    book = HB.book;
+    eq('rebuilt on 11 Mar: nothing skipped', [HB.calendar.today, E.skipped, E.log().length], [T1, [], 40]);
+    ok('41 cancel INV-U-0002', act('sales', 'cancel', { id: x.inv2.id, reason: 'delivered to the wrong parlour' }));
+    ok('42 cancel the electricity bill of 10 Mar', act('accounts', 'cancel', { id: x.ebill.id, reason: 'billed twice' }));
+    ok('43 PROD puff', post('production', 'PROD', { date: T1, itemId: 'puff', mixes: 1, goodUnits: 95, rejectedUnits: 5 }));
+    r = ok('44 PROD bread', post('production', 'PROD', { date: T1, itemId: 'bread', mixes: 1, goodUnits: 40 }));
+    ok('45 cancel it', act('production', 'cancel', { id: r.doc.id, reason: 'entered twice' }));
+    ok('46 RCPT in cash', post('accounts', 'RCPT', { date: T1, customerId: 'c_week', account: 'cash_factory', amount: 10000 }));
+    as('owner');
+
+    /* ----- as the Owner: every range against the documents and the cash ledger; a whole past month, a range across two
+       months, the day of the cancellations, the month to date, the life of the copy, and a month in which nothing moved */
+    [FEB, SPAN, [T1, T1], [T, T], MTD, LIFE, JAN].forEach(function (rg) {
+      eq('dash.period ' + rg[0] + '..' + rg[1] + ': sales by channel, collections in cash and into the bank, spend by location, production by product', selectedPeriod(rg[0], rg[1]), straightPeriod(rg[0], rg[1]));
+    });
+    eq('and the ranges are not empty: what the straight pass finds in each', [FEB, SPAN, [T1, T1], [T, T], MTD, LIFE, JAN].map(function (rg) { var w = straightPeriod(rg[0], rg[1]); return [(w.total || {}).net || 0, (w.collections || {}).total || 0, w.spendTotal || 0, (w.made || {}).goodUnits || 0]; }),
+      /* Feb: 12800, 5000, 9300000 + 1640000, 96. 20 Feb to 10 Mar: + 349542 of 10 Mar, + 1281950, + 1035500, + 217 of 9 Mar.
+         11 Mar: -118000, 10000, -1000000, 95. 10 Mar alone. March: 349542 - 118000, 1281950 + 10000, 1035500 - 1000000, 217 + 95 */
+      [[12800, 5000, 10940000, 96], [362342, 1286950, 11975500, 313], [-118000, 10000, -1000000, 95], [349542, 1281950, 1035500, 0], [231542, 1291950, 35500, 312], [244342, 1296950, 10975500, 408], [0, 0, 0, 0]]);
+
+    /* ----- the same, typed in: February, block by block as the page receives it */
+    var feb = period(FEB), pm = S.pnl.month('2026-02');
+    eq('February as dash.period returns it: a range, its two dates, and the four flows', [feb.period, feb.from, feb.to, feb.role, feb.sales, feb.collections, feb.spend,
+      [feb.production.runs, feb.production.expectedUnits, feb.production.goodUnits, feb.production.rejectedUnits, feb.production['yield'], feb.production.lossValue, feb.production.byItem.map(function (i) { return [i.itemId, i.goodUnits, i.lossValue]; })]],
+    ['range', FEB[0], FEB[1], 'owner',
+      { gross: 12800, returns: 0, net: 12800, units: 4, byChannel: [{ channel: 'retail', label: 'Retail outlets', gross: 12800, returns: 0, net: 12800, units: 4 },
+        { channel: 'corporate', label: 'Corporates', gross: 0, returns: 0, net: 0, units: 0 }, { channel: 'store', label: 'Own stores', gross: 0, returns: 0, net: 0, units: 0 }] },
+      { total: 5000, cash: 0, bank: 5000 },
+      { total: 10940000, byUnit: [{ unitId: 'factory', unitName: 'Factory', amount: 9300000 }, { unitId: 'st_vvn', unitName: 'Vidyanagar store', amount: 1640000 }] },
+      [1, 100, 96, 4, 0.96, 1928, [['puff', 96, 1928]]]]);
+    /* a.9: 10 Mar sold 359142, 9600 came back; 81950 was collected in cash and 1200000 into the bank; electricity 1000000 at the factory, travel 35000 and 500 short at the store */
+    eq('10 Mar as dash.period returns it', (function (p) { return [p.sales.gross, p.sales.returns, p.sales.net, p.sales.units, p.sales.byChannel.map(function (c) { return [c.channel, c.net, c.units]; }), p.collections, p.spend, p.production.runs]; })(period([T, T])),
+      [359142, -9600, 349542, 152, [['retail', 199400, 85], ['corporate', 45000, 15], ['store', 105142, 52]], { total: 1281950, cash: 81950, bank: 1200000 },
+        { total: 1035500, byUnit: [{ unitId: 'factory', unitName: 'Factory', amount: 1000000 }, { unitId: 'st_vvn', unitName: 'Vidyanagar store', amount: 35500 }] }, 0]);
+
+    /* ----- a whole month is the month of the P&L: net sales, by channel too, its expenses and its production loss */
+    eq('February: net sales, by channel, are the P&L\'s; spend is its expenses; the production loss is its line', [feb.sales.net, feb.sales.byChannel.map(function (c) { return c.net; }), feb.spend.total, feb.production.lossValue],
+      [pm.netSales.total, [pm.netSales.retail, pm.netSales.corporate, pm.netSales.store], pm.expenseTotal, pm.prodLoss]);
+    eq('and those are the figures worked out above', [pm.netSales.total, pm.expenseTotal, pm.prodLoss], [12800, 10940000, 1928]);
+    eq('January, a whole month with the opening entries alone, and March to the business date, likewise', [JAN, MTD].map(function (rg) { var p = period(rg); return [p.sales.net, p.spend.total, p.production.lossValue]; }),
+      ['2026-01', '2026-03'].map(function (mk) { var q = S.pnl.month(mk); return [q.netSales.total, q.expenseTotal, q.prodLoss]; }));
+
+    /* ----- the month to date is the default range: one result, and monthToDate() returns it */
+    var mtd = S.dash.monthToDate();
+    eq('for the month to date, dash.period is dash.monthToDate(): the same result, called a month', [period(MTD) === mtd, mtd.period, mtd.from, mtd.to, S.dash.period({ from: MTD[0], to: MTD[1], unitIds: null, preset: 'thisMonth' }) === mtd],
+      [true, 'month', MTD[0], T1, true]);
+    eq('and field by field', period(MTD), mtd);
+    eq('any other range is called a range, the business date alone is today()', [period(FEB).period, period([T1, T1]).period, period(LIFE).period, S.dash.today().period, S.dash.today().from, S.dash.today().to], ['range', 'range', 'range', 'today', T1, T1]);
+    eq('every range has the shape of monthToDate(): the same fields, the same blocks, the same fields in each block', [FEB, SPAN, [T1, T1], LIFE, JAN].map(function (rg) { return dashShape(period(rg)); }),
+      [0, 1, 2, 3, 4].map(function () { return dashShape(mtd); }));
+    eq('a balance is the same whatever the range: as it stands at the business date', [FEB, SPAN, LIFE, JAN].map(function (rg) { var p = period(rg); return BALANCES.map(function (k) { return p[k]; }); }),
+      [0, 1, 2, 3].map(function () { var d = S.dash.today(); return BALANCES.map(function (k) { return d[k]; }); }));
+    eq('the range is cut to go-live and the business date, as every range; with no range it is the life of the copy', [period(['2025-06-01', '2030-01-01']) === period(LIFE), S.dash.period() === period(LIFE), period(LIFE).from, period(LIFE).to], [true, true, GO, T1]);
+
+    /* ----- remembered per range until the book moves */
+    /* 47. the Owner's own claim of 100 for the factory, approved as it is raised: no change of persona, the book alone moves */
+    var before = period(FEB), same = period(FEB) === before, seq = book.seq;
+    ok('47 a claim by the Owner', post('owner', 'EXP', { kind: 'claim', date: T1, categoryId: 'travel', unitId: 'factory', amount: 100 }));
+    eq('a range is remembered until the book moves, then worked out again: February as it was, March with the claim', [same, book.seq > seq, period(FEB) === before, period(FEB) === period(FEB), period(FEB).spend.total, period(MTD).spend.total, S.dash.monthToDate() === period(MTD)],
+      [true, true, false, true, 10940000, 35600, true]);
+
+    /* ----- by role: the blocks of today(), cut to the scope */
+    eq('the blocks of a range, role by role, are those of today()', ROLES.map(function (role) { as(role); return [role, period(FEB).blocks.join(' '), period(LIFE).blocks.join(' ') === S.dash.today().blocks.join(' ')]; }), [
+      ['owner', 'sales collections cash spend production receivables payables approvals lowStock nearExpiry', true], ['accounts', 'sales collections cash spend production receivables payables approvals lowStock nearExpiry', true],
+      ['stores', 'lowStock nearExpiry', true], ['production', 'production lowStock nearExpiry', true], ['sales', 'sales collections receivables nearExpiry', true], ['store_mgr', 'sales cash spend nearExpiry', true]]);
+    as('accounts');
+    eq('accounts gets what the Owner gets', [FEB, LIFE].map(function (rg) { return selectedPeriod(rg[0], rg[1]); }), [FEB, LIFE].map(function (rg) { return straightPeriod(rg[0], rg[1]); }));
+    /* the store manager: the day-end of 10 Mar sold 105142 across the counter. Her store spent 35000 on travel and was 500
+       short on 10 Mar, and 40000 on electricity in February: never the 1600000 of its salaries */
+    as('store_mgr');
+    eq('the store manager gets her store only: its counter sales, its spend without salaries, its cash, and no other block',
+      (function (life, f2) {
+        return [life.blocks, life.sales.net, life.sales.byChannel.map(function (c) { return [c.channel, c.net]; }), life.spend, life.cash.rows.map(function (a) { return a.accountId; }),
+          [life.collections, life.production, life.receivables, life.payables, life.approvals, life.lowStock], f2.sales.net, f2.spend, period([T, T]).spend];
+      })(period(LIFE), period(FEB)),
+      [['sales', 'cash', 'spend', 'nearExpiry'], 105142, [['store', 105142]], { total: 75500, byUnit: [{ unitId: 'st_vvn', unitName: 'Vidyanagar store', amount: 75500 }] }, ['cash_st_vvn'],
+        [null, null, null, null, null, null], 0, { total: 40000, byUnit: [{ unitId: 'st_vvn', unitName: 'Vidyanagar store', amount: 40000 }] }, { total: 35500, byUnit: [{ unitId: 'st_vvn', unitName: 'Vidyanagar store', amount: 35500 }] }]);
+    /* sales: retail and corporate, 199400 + 45000 on 10 Mar, and every collection; nothing of the store, of what is owed to vendors or of what was spent */
+    as('sales');
+    eq('sales gets no payables and no spend: what it sells, what it collects and what it is owed',
+      (function (day, life) {
+        return [life.blocks, [life.payables, life.spend, life.cash, life.production, life.approvals, life.lowStock], day.sales.net, day.sales.byChannel.map(function (c) { return [c.channel, c.net]; }), day.collections,
+          life.receivables.open === S.ar.balances().totals.open, JSON.stringify(life).indexOf('"payables"') + JSON.stringify(life).indexOf('"spend"')];
+      })(period([T, T]), period(LIFE)),
+      [['sales', 'collections', 'receivables', 'nearExpiry'], [null, null, null, null, null, null], 244400, [['retail', 199400], ['corporate', 45000]], { total: 1281950, cash: 81950, bank: 1200000 }, true, -2]);
+    eq('for the four roles that see no salary, no range returns one', ['stores', 'production', 'sales', 'store_mgr'].map(function (role) {
+      as(role);
+      return [role, /[^0-9](1600000|1640000|9300000|10900000|10940000)[^0-9]/.test(JSON.stringify([period(FEB), period(SPAN), period(LIFE)]))];
+    }), [['stores', false], ['production', false], ['sales', false], ['store_mgr', false]]);
+
+    HB.calendar.set(T);
+    as('owner');
+    E.boot();
+    book = HB.book;
+  });
+
+  /*
+   * s.9: what a dashboard result holds beside its blocks (the cockpit at the top of the dashboard), on the copy of s.8
+   * rebuilt on 11 Mar from its log, with one more entry: a stale return back-dated into February. The points of a
+   * range (its days, or its months when it is longer than 62 days), the day facts of the sales, the gross margin,
+   * the stale returns as a share of supply, spend by location and category, the balance at the end of each point and
+   * the ageing of what is open, each against a straight pass over the raw ledger rows and the documents.
+   */
+  section('s.9 the cockpit of the dashboard: the points of a range, the day facts, margin, returns, spend and the balances behind the small charts, each against a straight pass; by role', function () {
+    var FEB = ['2026-02-01', '2026-02-28'], JAN = [GO, '2026-01-31'], SPAN = ['2026-02-20', T], MTD = ['2026-03-01', T1], LIFE = [GO, T1];
+    var RANGES = [FEB, SPAN, [T1, T1], [T, T], MTD, LIFE, JAN], ROLES = ['owner', 'accounts', 'stores', 'production', 'sales', 'store_mgr'];
+    var AXIS = ['key', 'label', 'from', 'to', 'whole'], BESIDE = ['salesFacts', 'margin', 'returns', 'spendFacts'];
+    function period(rg) { return S.dash.period({ from: rg[0], to: rg[1] }); }
+    function total(points, k) { return points.reduce(function (s, p) { return s + (p[k] || 0); }, 0); }
+    function series(rg, k) { return period(rg).points.map(function (p) { return p[k]; }); }
+    HB.calendar.set(T1);
+    as('owner');
+    E.boot();
+    book = HB.book;
+    eq('the copy of s.8, rebuilt on 11 Mar from its log: every entry applies', [HB.calendar.today, E.skipped, E.log().length], [T1, [], 47]);
+    /* 48. the Owner back-dates a stale return of one loaf from the weekly outlet to 25 Feb: 3200 of the 12800 it was supplied in
+       the seven days before, which is 25%, above the limit of 8%: the Owner's own document, approved as it is raised */
+    r = ok('48 a stale return of 25 Feb', post('owner', 'CN', { date: '2026-02-25', customerId: 'c_week', lines: [{ itemId: 'bread', qty: 1 }] }));
+    eq('it is posted, on its own date, at a quarter of the supply', [r.doc.status, r.doc.date, r.doc.taxable, r.doc.sharePct], ['POSTED', '2026-02-25', 3200, 25]);
+
+    /* ----- as the Owner: every range against the ledgers and the documents */
+    RANGES.forEach(function (rg) {
+      eq('dash.period ' + rg[0] + '..' + rg[1] + ': its days or months, the figures of each point, the day facts, margin, returns and spend', selectedCockpit(rg[0], rg[1]), straightCockpit(rg[0], rg[1]));
+    });
+    eq('and the ranges are not empty: days, grain, points, and what the straight pass finds in the points of each', RANGES.map(function (rg) {
+      var w = straightCockpit(rg[0], rg[1]);
+      return [w.days, w.grain, w.points.length, total(w.points, 'netSales'), total(w.points, 'collected'), total(w.points, 'materialCost') > 0, total(w.points, 'goodUnits'), total(w.points, 'supplied'), total(w.points, 'returned')];
+    }),
+    /* February: the invoice of 12800 less the return of 3200, the receipt of 5000, the loss of the puff run and the cost of four loaves, 96 puffs.
+       20 Feb to 10 Mar adds 10 Mar: 349542 sold, 1281950 collected, 217 made on 9 Mar; of the 359142 sold, 254000 went out on invoice and 9600 came back.
+       11 Mar: the sheet invoice of 118000 cancelled, 10000 received, the cost of that invoice taken back, 95 puffs (40 loaves entered and cancelled).
+       The life of the copy is 70 days, so three months; January has the opening entries alone */
+    [[28, 'day', 28, 9600, 5000, true, 96, 12800, 3200], [19, 'day', 19, 359142, 1286950, true, 313, 266800, 12800], [1, 'day', 1, -118000, 10000, false, 95, -118000, 0],
+      [1, 'day', 1, 349542, 1281950, true, 0, 254000, 9600], [11, 'day', 11, 231542, 1291950, true, 312, 136000, 9600], [70, 'month', 3, 241142, 1296950, true, 408, 148800, 12800], [31, 'day', 31, 0, 0, false, 0, 0, 0]]);
+
+    /* ----- the points add up to the totals of the blocks: what a tile says is what its small chart draws */
+    eq('in every range the points add up to the tiles: net sales, collections, good units, material cost, what was supplied and what came back', RANGES.map(function (rg) {
+      var p = period(rg);
+      return [total(p.points, 'netSales') === p.sales.net, total(p.points, 'collected') === p.collections.total, total(p.points, 'goodUnits') === p.production.goodUnits,
+        total(p.points, 'materialCost') === p.margin.materialCost, total(p.points, 'supplied') === p.returns.supplied, total(p.points, 'returned') === p.returns.returned,
+        p.margin.netSales === p.sales.net, p.returns.returned === -p.sales.returns, p.margin.grossMargin === p.sales.net - p.margin.materialCost];
+    }), RANGES.map(function () { return [true, true, true, true, true, true, true, true, true]; }));
+    eq('the months of a long range are its days added up: January, February and March to date', ['netSales', 'collected', 'materialCost', 'goodUnits', 'supplied', 'returned'].map(function (k) {
+      return [series(LIFE, k), [JAN, FEB, MTD].map(function (rg) { var days = period(rg).points; return days.some(function (p) { return p[k] !== null; }) ? total(days, k) : null; })];
+    }), ['netSales', 'collected', 'materialCost', 'goodUnits', 'supplied', 'returned'].map(function (k) { var m = series(LIFE, k); return [m, m]; }));
+    eq('spend by location and by category add up to the spend of the tile, in every range', RANGES.map(function (rg) {
+      var p = period(rg);
+      return [total(p.spendFacts.byLocation, 'amount') === p.spend.total, total(p.spendFacts.byCategory, 'amount') === p.spend.total, p.spendFacts.byLocation.map(function (u) { return u.unitId; })];
+    }), RANGES.map(function () { return [true, true, ['factory', 'st_vvn']]; }));
+
+    /* ----- the balance at the end of each point: every row of the cash ledger up to that day, and the last one is the tile's when the range ends today */
+    eq('the balance at the end of a day is the cash book\'s closing balance of that day, account by account', [FEB, MTD, LIFE].map(function (rg) {
+      return period(rg).points.map(function (p) { return p.cashBalance; });
+    }), [FEB, MTD, LIFE].map(function (rg) {
+      return period(rg).points.map(function (p) { return HB.masters.accounts.reduce(function (s, a) { return s + S.cash.book(a.id, { from: GO, to: p.to }).closing; }, 0); });
+    }));
+    eq('a range that ends on the business date ends on the balance of the tile; an earlier one on the balance of its last day', [lastOf(period(MTD).points).cashBalance, lastOf(period(LIFE).points).cashBalance, lastOf(period([T1, T1]).points).cashBalance,
+      lastOf(period(FEB).points).cashBalance === S.dash.today().cash.total],
+    [S.dash.today().cash.total, S.dash.today().cash.total, S.dash.today().cash.total, false]);
+
+    /* ----- which points a line draws: a finished day or a finished month held in full */
+    eq('whole: every day but the business date; a month held in full and over', [series(FEB, 'whole').indexOf(false), series(MTD, 'whole'), series(LIFE, 'whole'), series([T1, T1], 'whole'), series([T, T], 'whole')],
+      [-1, [true, true, true, true, true, true, true, true, true, true, false], [true, true, false], [false], [true]]);
+    /* 9 Jan to 11 Mar is 23 + 28 + 11 = 62 days, the longest range drawn by day; from 8 Jan it is 63, drawn by month, and January is held in part */
+    eq('62 days are drawn by day, 63 by month; a month the range holds part of is not whole; a range is cut to the business date first', [S.dash.period({ from: '2026-01-09', to: T1 }).grain, S.dash.period({ from: '2026-01-09', to: T1 }).points.length,
+      S.dash.period({ from: '2026-01-08', to: T1 }).grain, S.dash.period({ from: '2026-01-08', to: T1 }).points.map(function (p) { return [p.key, p.label, p.from, p.to, p.whole]; }),
+      [S.dash.period({ from: '2026-01-08', to: '2026-03-31' }).days, S.dash.period({ from: '2026-01-10', to: '2026-03-12' }).days, S.dash.period({ from: '2026-01-10', to: '2026-03-12' }).grain]],
+    ['day', 62, 'month', [['2026-01', 'Jan 2026', '2026-01-08', '2026-01-31', false], ['2026-02', 'Feb 2026', '2026-02-01', '2026-02-28', true], ['2026-03', 'Mar 2026', '2026-03-01', T1, false]], [63, 61, 'day']]);
+
+    /* ----- the same, typed in: February and the nineteen days to 10 Mar, as the page receives them */
+    var feb = period(FEB), span = period(SPAN), mtd = period(MTD);
+    eq('February: one open day, the best and the slowest; retail and its route lead with all of it', feb.salesFacts,
+      { openDays: 1, average: 9600, best: { date: '2026-02-20', net: 12800 }, slowest: { date: '2026-02-20', net: 12800 },
+        channel: { channel: 'retail', label: 'Retail outlets', net: 9600, share: 1 }, route: { routeId: 'r1', label: 'Anand town', net: 9600, share: 1 } });
+    eq('February, the points of its three days with something: sold on the 20th, received on the 24th, returned and baked on the 25th', [19, 23, 24].map(function (i) { var p = feb.points[i]; return [p.key, p.label, p.netSales, p.collected, p.goodUnits, p.supplied, p.returned, p.returnShare]; }),
+      [['2026-02-20', '20 Feb', 12800, null, null, 12800, null, 0], ['2026-02-24', '24 Feb', null, 5000, null, null, null, null], ['2026-02-25', '25 Feb', -3200, null, 96, null, 3200, null]]);
+    eq('February: a quarter of what was supplied came back, above the limit of 8%; 10 Mar is under it at 9600 of 254000', [feb.returns, period([T, T]).returns],
+      [{ supplied: 12800, returned: 3200, share: 0.25, limitPct: 8, over: true }, { supplied: 254000, returned: 9600, share: 9600 / 254000, limitPct: 8, over: false }]);
+    /* the limit is the masters': a quarter came back, so a limit of 25% is exactly met, which is within it, and one of 24% is passed */
+    eq('the limit is read from the masters; exactly at the limit is within it, as for a return', (function () {
+      var keep = HB.masters.limits.returnsPct, out = [];
+      [25, 24].forEach(function (pct) { HB.masters.limits.returnsPct = pct; S.reset(); out.push(period(FEB).returns.over, period(FEB).returns.limitPct); });
+      HB.masters.limits.returnsPct = keep; S.reset();
+      return out.concat([period(FEB).returns.limitPct]);
+    })(), [false, 25, true, 24, 8]);
+    /* the production loss of February is 1928 (s.8, entry 38); the cost of the four loaves is the one its invoice carries */
+    var loaves = book.byType.INV.filter(function (d) { return d.date === '2026-02-20'; })[0].cost;
+    eq('February: the gross margin is net sales less the cost of the loaves and the loss of the puff run', [loaves > 0, feb.margin.netSales, feb.margin.cogs, feb.margin.prodLoss, feb.margin.writeoff, feb.margin.countDiff, feb.margin.materialCost, feb.margin.grossMargin,
+      feb.margin.grossMarginPct, feb.margin.materialPct],
+    [true, 9600, loaves, 1928, 0, 0, loaves + 1928, 9600 - loaves - 1928, (9600 - loaves - 1928) / 9600, (loaves + 1928) / 9600]);
+    eq('February spent 9300000 at the factory and 1640000 at the store; salaries are the largest of its two categories', feb.spendFacts,
+      { byLocation: [{ unitId: 'factory', unitName: 'Factory', amount: 9300000, share: 9300000 / 10940000 }, { unitId: 'st_vvn', unitName: 'Vidyanagar store', amount: 1640000, share: 1640000 / 10940000 }],
+        byCategory: [{ categoryId: 'salaries', categoryName: 'Salaries', amount: 10900000, share: 10900000 / 10940000 }, { categoryId: 'electricity', categoryName: 'Electricity', amount: 40000, share: 40000 / 10940000 }],
+        largest: { categoryId: 'salaries', categoryName: 'Salaries', amount: 10900000, share: 10900000 / 10940000 } });
+    eq('20 Feb to 10 Mar: two open days of nineteen, the average over the two, the best and the slowest of them', [span.days, span.salesFacts.openDays, span.salesFacts.average, span.salesFacts.best, span.salesFacts.slowest, span.salesFacts.channel.channel, span.salesFacts.route.net],
+      [19, 2, Math.round(359142 / 2), { date: T, net: 349542 }, { date: '2026-02-20', net: 12800 }, 'retail', 199400 + 12800 - 3200]);
+    /* 11 Mar took the sheet invoice of 118000 back and sold nothing: it is no open day, and it is not the slowest day of March */
+    eq('March to date: the day of the cancellation is not an open day; a month with no sale has none', [mtd.salesFacts.openDays, mtd.salesFacts.average, mtd.salesFacts.best, mtd.salesFacts.slowest, lastOf(mtd.points).netSales, period(JAN).salesFacts],
+      [1, 231542, { date: T, net: 349542 }, { date: T, net: 349542 }, -118000, { openDays: 0, average: null, best: null, slowest: null, channel: null, route: null }]);
+    eq('a whole month against its P&L: net sales, material cost and gross margin, with its percentage', [['2026-01', JAN], ['2026-02', FEB], ['2026-03', MTD]].map(function (x) {
+      var m = period(x[1]).margin;
+      return [m.netSales, m.cogs, m.prodLoss, m.writeoff, m.countDiff, m.materialCost, m.grossMargin, m.grossMarginPct];
+    }), ['2026-01', '2026-02', '2026-03'].map(function (mk) {
+      var q = S.pnl.month(mk);
+      return [q.netSales.total, q.cogs.total, q.prodLoss, q.writeoff, q.countDiff, q.materialCost, q.grossMargin, q.grossMarginPct];
+    }));
+
+    /* ----- what is open by age: the same in every call, and each bucket the open amounts of its due dates */
+    var sb = straightBalances(), now = S.dash.today();
+    eq('receivables and payables by age: five buckets, each the open amounts whose due date falls in it, with its share', [now.receivables.buckets, now.payables.buckets],
+      [straightBuckets(sb.open, function () { return true; }), straightBuckets(sb.apOpen, function (d) { return d.type === 'VBILL' || d.payeeType === 'vendor'; })]);
+    eq('the buckets add up to what is open, and what is past due to what is overdue', [total(now.receivables.buckets, 'amount'), total(now.receivables.buckets.slice(1), 'amount'), total(now.payables.buckets, 'amount'), total(now.payables.buckets.slice(1), 'amount')],
+      [now.receivables.open, now.receivables.overdue, now.payables.open, now.payables.overdue]);
+    eq('and something is open in them', [now.receivables.open > 0, now.payables.open > 0, now.receivables.buckets.map(function (x) { return x.key; })], [true, true, ['notDue', 'd1_15', 'd16_30', 'd31_60', 'd60p']]);
+
+    /* ----- today() is the range of the business date alone; a result is remembered until the book moves */
+    eq('today() holds the same beside its blocks as the range of the business date', (function (d) { return plain({ days: d.days, grain: d.grain, points: d.points, salesFacts: d.salesFacts, margin: d.margin, returns: d.returns, spendFacts: d.spendFacts }); })(S.dash.today()),
+      selectedCockpit(T1, T1));
+    eq('every range has the same fields beside its blocks, and every point of a range the same fields', RANGES.map(function (rg) { var p = period(rg); return [Object.keys(p).join(' '), p.points.every(function (q) { return Object.keys(q).join(' ') === Object.keys(p.points[0]).join(' '); })]; }),
+      RANGES.map(function () { return [Object.keys(period(MTD)).join(' '), true]; }));
+    eq('the points are remembered with their range', [period(FEB).points === period(FEB).points, period(FEB).salesFacts === period(FEB).salesFacts], [true, true]);
+
+    /* ----- by role: a point carries the figures of the blocks the role gets, and nothing beside the blocks that is not its own */
+    eq('role by role: what stands beside the blocks, and the figures of a point, for a range by day and a range by month, and for today', ROLES.map(function (role) {
+      as(role);
+      var p = period(LIFE), q = period(FEB), d = S.dash.today();
+      function fields(x) { return Object.keys(x.points[0]).filter(function (k) { return AXIS.indexOf(k) === -1; }).join(' '); }
+      return [role, BESIDE.filter(function (k) { return p[k] !== undefined; }).join(' '), fields(p), fields(q) === fields(p) && fields(d) === fields(p), [p.days, p.grain, p.points.length, q.grain, q.points.length],
+        BESIDE.filter(function (k) { return q[k] !== undefined || d[k] !== undefined; }).length === BESIDE.filter(function (k) { return p[k] !== undefined; }).length];
+    }), [
+      ['owner', 'salesFacts margin returns spendFacts', 'netSales collected materialCost marginPct goodUnits supplied returned returnShare cashBalance', true, [70, 'month', 3, 'day', 28], true],
+      ['accounts', 'salesFacts margin returns spendFacts', 'netSales collected materialCost marginPct goodUnits supplied returned returnShare cashBalance', true, [70, 'month', 3, 'day', 28], true],
+      ['stores', '', '', true, [70, 'month', 3, 'day', 28], true],
+      ['production', '', 'goodUnits', true, [70, 'month', 3, 'day', 28], true],
+      ['sales', 'salesFacts returns', 'netSales collected supplied returned returnShare', true, [70, 'month', 3, 'day', 28], true],
+      ['store_mgr', 'salesFacts spendFacts', 'netSales cashBalance', true, [70, 'month', 3, 'day', 28], true]]);
+    as('owner');
+    var own = straightCockpit(GO, T1);
+    as('accounts');
+    eq('accounts gets what the Owner gets', [FEB, LIFE].map(function (rg) { return selectedCockpit(rg[0], rg[1]); }), [FEB, LIFE].map(function (rg) { return straightCockpit(rg[0], rg[1]); }));
+    eq('and the same ageing', [S.dash.today().receivables.buckets, S.dash.today().payables.buckets], [now.receivables.buckets, now.payables.buckets]);
+    /* production: the good units of the Owner's points and nothing else */
+    as('production');
+    eq('production gets the good units of each point, as the Owner does, and no other figure', [series(LIFE, 'goodUnits'), series(MTD, 'goodUnits'), JSON.stringify(period(LIFE)).indexOf('netSales') + JSON.stringify(period(LIFE)).indexOf('cashBalance')],
+      [own.points.map(function (p) { return p.goodUnits; }), straightCockpit(MTD[0], MTD[1]).points.map(function (p) { return p.goodUnits; }), -2]);
+    /* sales: retail and corporate, so its net sales of a day are what went out on invoice less what came back; every collection; no cost, no margin, no balance */
+    as('sales');
+    eq('sales gets its own sales in each point (supplied less returned), every collection, the returns, and no cost, margin, spend or balance',
+      (function (p, day) {
+        return [p.points.map(function (q) { return q.netSales; }), p.points.map(function (q) { return q.collected; }), p.returns, p.salesFacts.channel.channel, p.salesFacts.route, day.salesFacts.best,
+          [p.margin, p.spendFacts, p.points[0].materialCost, p.points[0].marginPct, p.points[0].cashBalance, p.points[0].goodUnits], /"(cogs|materialCost|marginPct|cashBalance|spendFacts|margin)"/.test(JSON.stringify([p, day, S.dash.today()]))];
+      })(period(LIFE), period([T, T])),
+      [own.points.map(function (q) { return q.supplied === null && q.returned === null ? null : (q.supplied || 0) - (q.returned || 0); }), own.points.map(function (q) { return q.collected; }), own.returns, 'retail',
+        { routeId: 'r1', label: 'Anand town', net: own.salesFacts.route.net, share: own.salesFacts.route.net / (own.returns.supplied - own.returns.returned) }, { date: T, net: 244400 },
+        [null, null, null, null, null, null], false]);
+    eq('and the ageing of what it is owed, never of what is owed to vendors', [S.dash.today().receivables.buckets, S.dash.today().payables], [now.receivables.buckets, null]);
+    /* the store manager: the counter sales of her store (105142 on 10 Mar), the balance of its cash, its spend without salaries */
+    as('store_mgr');
+    eq('the store manager gets her store only: its sales in each point, the balance of its cash at each day\'s end, its spend by category without salaries',
+      (function (p, m, f2) {
+        return [p.points.map(function (q) { return q.netSales; }), m.points.map(function (q) { return q.cashBalance; }), lastOf(m.points).cashBalance === S.dash.today().cash.total,
+          p.salesFacts, p.spendFacts, f2.spendFacts, [p.margin, p.returns, p.points[0].collected, p.points[0].supplied, p.points[0].goodUnits]];
+      })(period(LIFE), period(MTD), period(FEB)),
+      [[null, null, 105142], period(MTD).points.map(function (q) { return book.cash.entries.reduce(function (s, x) { return s + (x.accountId === 'cash_st_vvn' && x.date <= q.to ? x.amount : 0); }, 0); }), true,
+        { openDays: 1, average: 105142, best: { date: T, net: 105142 }, slowest: { date: T, net: 105142 }, channel: { channel: 'store', label: 'Own stores', net: 105142, share: 1 }, route: null },
+        { byLocation: [{ unitId: 'st_vvn', unitName: 'Vidyanagar store', amount: 75500, share: 1 }],
+          byCategory: [{ categoryId: 'electricity', categoryName: 'Electricity', amount: 40000, share: 40000 / 75500 }, { categoryId: 'travel', categoryName: 'Travel and conveyance', amount: 35000, share: 35000 / 75500 }, { categoryId: 'cash_short', categoryName: 'Store cash short / excess', amount: 500, share: 500 / 75500 }],
+          largest: { categoryId: 'electricity', categoryName: 'Electricity', amount: 40000, share: 40000 / 75500 } },
+        { byLocation: [{ unitId: 'st_vvn', unitName: 'Vidyanagar store', amount: 40000, share: 1 }], byCategory: [{ categoryId: 'electricity', categoryName: 'Electricity', amount: 40000, share: 1 }],
+          largest: { categoryId: 'electricity', categoryName: 'Electricity', amount: 40000, share: 1 } },
+        [null, null, null, null, null]]);
+    as('stores');
+    eq('stores gets the days of the range and nothing in them', [period(LIFE).points, period([T1, T1]).points, BESIDE.filter(function (k) { return period(LIFE)[k] !== undefined; })],
+      [[{ key: '2026-01', label: 'Jan 2026', from: GO, to: '2026-01-31', whole: true }, { key: '2026-02', label: 'Feb 2026', from: '2026-02-01', to: '2026-02-28', whole: true }, { key: '2026-03', label: 'Mar 2026', from: '2026-03-01', to: T1, whole: false }],
+        [{ key: T1, label: '11 Mar', from: T1, to: T1, whole: false }], []]);
+    eq('for the four roles that see no salary, nothing beside the blocks returns one', ['stores', 'production', 'sales', 'store_mgr'].map(function (role) {
+      as(role);
+      return [role, /[^0-9](1600000|1640000|9300000|10900000|10940000)[^0-9]/.test(JSON.stringify([period(FEB), period(SPAN), period(LIFE), S.dash.today()])), /salar/i.test(JSON.stringify([period(FEB).spendFacts || null, period(LIFE).spendFacts || null]))];
+    }), [['stores', false, false], ['production', false, false], ['sales', false, false], ['store_mgr', false, false]]);
+
+    /* ----- the leading route rests on the route of each return: that of the outlet's latest invoice by date, also when an
+       invoice was back-dated after the outlet moved. 49. the weekly outlet moves to a second route (added to the masters by
+       hand, as in s.5); 50. the Owner back-dates an invoice of one loaf to 26 Feb, which is raised on the new route;
+       51. a loaf comes back on 11 Mar: the outlet's latest invoice by date is still that of 10 Mar, on the old route */
+    as('owner');
+    HB.masters.routes.push({ id: 'r2', name: 'Vidyanagar', stops: [], active: true });
+    HB.masters.routeById.r2 = lastOf(HB.masters.routes);
+    S.reset();
+    ok('49 the weekly outlet moves to route r2', act('accounts', 'master', { entity: 'customers', record: { id: 'c_week', routeId: 'r2' } }));
+    r = ok('50 an invoice back-dated to 26 Feb', post('owner', 'INV', { date: '2026-02-26', customerId: 'c_week', lines: [{ itemId: 'bread', qty: 1 }] }));
+    ok('51 a stale return of 11 Mar', post('owner', 'CN', { date: T1, customerId: 'c_week', lines: [{ itemId: 'bread', qty: 1 }] }));
+    eq('the back-dated invoice is on the new route; the return of 11 Mar and that of 25 Feb stay on the old one, where the outlet\'s latest invoice before each was raised',
+      [r.doc.routeId, S.sell.returns({ from: T1, to: T1 }).rows.map(function (q) { return [q.customerId, q.routeId]; }), S.sell.returns({ from: '2026-02-25', to: '2026-02-25' }).rows.map(function (q) { return [q.customerId, q.routeId]; }),
+        period(FEB).salesFacts.route, S.sell.by('route', { from: FEB[0], to: FEB[1] }).rows.map(function (g) { return [g.key, g.net]; })],
+      ['r2', [['c_week', 'r1']], [['c_week', 'r1']], { routeId: 'r1', label: 'Anand town', net: 9600, share: 9600 / 12800 }, [['r1', 9600], ['r2', 3200]]]);
+    eq('and February is still what the ledgers and the documents hold', selectedCockpit(FEB[0], FEB[1]).points, straightCockpit(FEB[0], FEB[1]).points);
+
+    /* ----- on the last day of a month, a range that ends today holds the month in full while it is still being entered:
+       it is whole from the next day on */
+    HB.calendar.set('2026-03-31');
+    as('owner');
+    E.boot();
+    eq('31 Mar: March is held in full and still running, so it is not whole; nor is the day', [S.dash.period({ from: GO, to: '2026-03-31' }).points.map(function (p) { return [p.key, p.to, p.whole]; }),
+      S.dash.period({ from: '2026-03-30', to: '2026-03-31' }).points.map(function (p) { return p.whole; })],
+    [[['2026-01', '2026-01-31', true], ['2026-02', '2026-02-28', true], ['2026-03', '2026-03-31', false]], [true, false]]);
+    HB.calendar.set('2026-04-01');
+    E.boot();
+    eq('1 Apr: March is over, and whole', S.dash.period({ from: GO, to: '2026-03-31' }).points.map(function (p) { return [p.key, p.whole]; }), [['2026-01', true], ['2026-02', true], ['2026-03', true]]);
+
     HB.calendar.set(T);
     as('owner');
     E.boot();

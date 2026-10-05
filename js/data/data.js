@@ -22,6 +22,7 @@
   var FAR = '9999-12-31';        /* later than any date a row can carry */
   var MAX_RESULTS = 4000;        /* results remembered for one state of the book before the cache starts again */
   var ROW_LIMIT = 5000;          /* the stock ledger and the audit log of two years are too long to hand to a table whole */
+  var DAY_POINTS = 62;           /* the dashboard gives a range of up to this many days a point a day, a longer one a point a month */
 
   /* --------------------------------------------------------------- cache */
   /*
@@ -1137,17 +1138,26 @@
     return r;
   }
 
-  /** The invoices of a customer, oldest first, each with the route it was raised on: where the outlet was at the time. */
+  /**
+   * The invoices of a customer, oldest first (by date, then by posting order), each with the route it was raised on:
+   * where the outlet was at the time. The documents themselves, read only. The lists of all customers are made in
+   * one walk over the invoices, once per state of the book: the dashboard asks for the route of every return of its
+   * range on every redraw.
+   */
   function invoiceRoutes(c, customerId) {
-    return memo('sell.invoiceRoutes', customerId, function () {
-      var rows = c.book.ar.byParty[customerId] || [], out = [], i, d;
-      for (i = 0; i < rows.length; i++) {
-        if (rows[i].kind !== 'invoice' || rows[i].reversal) continue;
-        d = c.book.docs[rows[i].docId];
-        if (d && d.type === 'INV') out.push({ date: d.date, seq: d.seq, routeId: d.routeId || null });
+    var all = memo('sell.invoiceRoutes', undefined, function () {
+      var list = c.book.byType.INV || [], by = {}, unsorted = {}, i, d, a, k;
+      for (i = 0; i < list.length; i++) {
+        d = list[i];
+        a = by[d.customerId] || (by[d.customerId] = []);
+        /* posting order is date order unless an invoice was back-dated: only then does a list need sorting */
+        if (a.length && a[a.length - 1].date > d.date) unsorted[d.customerId] = true;
+        a.push(d);
       }
-      return out.sort(byDateSeq);
+      for (k in unsorted) if (has.call(unsorted, k)) by[k].sort(byDateSeq);
+      return by;
     });
+    return all[customerId] || [];
   }
 
   /**
@@ -1159,11 +1169,13 @@
     if (!d) return null;
     if (d.type === 'INV') return d.routeId || null;
     if (!d.customerId) return null;
-    var list = invoiceRoutes(c, d.customerId), i, x;
-    for (i = list.length - 1; i >= 0; i--) {
-      x = list[i];
-      if (x.date < d.date || (x.date === d.date && x.seq < d.seq)) return x.routeId;
+    /* the last invoice before the document, by date and then by posting order: the list is in that order, so it is found by halving */
+    var list = invoiceRoutes(c, d.customerId), lo = 0, hi = list.length, mid, x;
+    while (lo < hi) {
+      mid = (lo + hi) >> 1; x = list[mid];
+      if (x.date < d.date || (x.date === d.date && x.seq < d.seq)) lo = mid + 1; else hi = mid;
     }
+    if (lo > 0) return list[lo - 1].routeId || null;
     var cu = HB.masters.customerById[d.customerId];
     return cu ? cu.routeId || null : null;
   }
@@ -2522,9 +2534,181 @@
   /*
    * SPEC section 7, last paragraph: which blocks a role gets. Each block is given to the roles that have a page
    * showing the same thing, so nothing is decided twice; home.js draws the blocks it receives and nothing else.
-   * Flows (sales, collections, spend, production) are of the period; balances (cash, receivables, payables,
-   * approvals, low stock, near-expiry) are as they stand now in both periods. No figure of another period.
+   * Flows (sales, collections, spend, production) are of the period asked for: the business date, or a range.
+   * Balances (cash, receivables, payables, approvals, low stock, near-expiry) are as they stand at the business
+   * date whatever the period. One period per call: no figure of another period beside it.
+   *
+   * Beside the blocks a result says what the top of the dashboard draws (dashRange): the days of the range, or its
+   * months when it is longer than DAY_POINTS days, each with the figures of the blocks the persona gets; the day
+   * facts of the sales; the gross margin; the stale returns as a share of supply; spend by location and by
+   * category; and, in the receivables and payables blocks, what is open by age. Every point lies inside the range
+   * that was asked for: a line of the range itself, never one period set against another.
    */
+
+  /** The open amounts of an ageing total, bucket by bucket, each with its share of everything open. */
+  function bucketsOf(totals) {
+    return BUCKETS.map(function (b) { return { key: b.key, label: b.label, amount: totals[b.key], share: ratio(totals[b.key], totals.open) }; });
+  }
+
+  /**
+   * The points of a range, oldest first: its days ('day'), or its months ('month'), a month holding only its days
+   * inside the range. { key, label, from, to, whole }: key is the date or 'YYYY-MM', from and to the days the point
+   * covers. whole says that the point is a finished day or a finished month held in full: false for the business
+   * date, which is still being entered, and for a month the range holds only part of (or that is still running).
+   * Such a point has fewer entries than its neighbours for no reason of the business, so a line of what moved leaves
+   * it out (a balance does not grow with the days: its line keeps it); its figures are in the point all the same,
+   * and in the totals.
+   */
+  function pointsOf(from, to, grain) {
+    var out = [], today = HB.calendar.today, mk, first, last;
+    if (grain === 'day') {
+      D.range(from, to).forEach(function (d) { out.push({ key: d, label: D.label(d, 'd MMM'), from: d, to: d, whole: d < today }); });
+      return out;
+    }
+    for (mk = from.slice(0, 7); mk <= to.slice(0, 7); mk = D.monthKey(D.addDays(D.monthEnd(mk + '-01'), 1))) {
+      first = mk + '-01'; last = D.monthEnd(first);
+      out.push({ key: mk, label: D.monthLabel(mk, true), from: first < from ? from : first, to: last > to ? to : last, whole: first >= from && last <= to && last < today });
+    }
+    return out;
+  }
+
+  /**
+   * What a dashboard result holds beside its blocks, for its range. One walk over the days of the range, by the rows'
+   * own dates like every figure; cut to the scope and to the blocks the persona gets: a point carries no figure of a
+   * block that is not in `out`. s is the sales summary of the range (null for a role without sales).
+   *
+   * A point's figure is null where the day (or the month) has no row of its kind: the factory was closed, or it is
+   * the business date and nothing is posted yet. A line then has a gap there, not a fall to nothing, and the figures
+   * that are there add up to the total of the block.
+   */
+  function dashRange(c, out, s) {
+    var from = out.from, to = out.to, f = { from: from, to: to };
+    var days = D.diffDays(from, to) + 1, grain = days <= DAY_POINTS ? 'day' : 'month';
+    var points = pointsOf(from, to, grain), index = {}, flow = [], i;
+    var factory = unitOk(c, FACTORY);
+    var wSales = !!out.sales, wCollected = !!out.collections && factory, wMade = !!out.production, wCash = !!out.cash;
+    var wMargin = wSales && sees('pnl'), wReturns = wSales && factory;
+    var byDay = {}, cost = { cogs: 0, prodLoss: 0, writeoff: 0, countDiff: 0 }, supplied = 0, returned = 0;
+
+    for (i = 0; i < points.length; i++) {
+      index[points[i].key] = i;
+      flow.push(0);
+      if (wSales) points[i].netSales = null;
+      if (out.collections) points[i].collected = null;
+      if (wMargin) { points[i].materialCost = null; points[i].marginPct = null; }
+      if (wMade) points[i].goodUnits = null;
+      if (wReturns) { points[i].supplied = null; points[i].returned = null; points[i].returnShare = null; }
+      if (wCash) points[i].cashBalance = null;
+    }
+    function add(p, key, n) { p[key] = (p[key] || 0) + n; }
+
+    eachDay(from, to, function (day) {
+      var at = index[grain === 'day' ? day.date : day.date.slice(0, 7)], p = points[at], j, x, t;
+      if (wSales) {
+        for (j = 0; j < day.pnl.length; j++) {
+          x = day.pnl[j];
+          if (x.line === 'sales' || x.line === 'returns') {
+            if (!unitOk(c, x.unitId)) continue;
+            add(p, 'netSales', x.amount);
+            t = byDay[day.date] || (byDay[day.date] = { date: day.date, gross: 0, net: 0 });
+            t.net += x.amount;
+            if (x.line === 'sales') t.gross += x.amount;
+            /* what went out on invoice to outlets and corporates, and what came back from them: a store sells at its counter and returns nothing */
+            if (wReturns && x.channel !== 'store') {
+              if (x.line === 'sales') { add(p, 'supplied', x.amount); supplied += x.amount; }
+              else { add(p, 'returned', -x.amount); returned -= x.amount; }
+            }
+          } else if (wMargin && has.call(cost, x.line)) {
+            add(p, 'materialCost', x.amount);
+            cost[x.line] += x.amount;
+          }
+        }
+      }
+      if (wCollected || wCash) {
+        for (j = 0; j < day.cash.length; j++) {
+          x = day.cash[j];
+          if (wCollected && (x.kind === 'collected' || x.kind === 'receipt')) add(p, 'collected', x.amount);
+          if (wCash && accountOk(c, x.accountId)) flow[at] += x.amount;
+        }
+      }
+      if (wMade) {
+        for (j = 0; j < day.docs.length; j++) {
+          x = day.docs[j];
+          if (x.type === 'PROD') add(p, 'goodUnits', x.goodUnits);
+          else if (x.type === 'CXL' && x.targetType === 'PROD' && c.book.docs[x.targetId]) add(p, 'goodUnits', -c.book.docs[x.targetId].goodUnits);
+        }
+      }
+    });
+
+    out.days = days;
+    out.grain = grain;
+    out.points = points;
+
+    if (wSales) {
+      var open = 0, best = null, slowest = null, channel = null, route = null, k;
+      /* an open day is one on which something was sold: a day the factory was closed, or the business date before
+         its sheets are posted, is neither the slowest day nor a day of the average */
+      for (k in byDay) {
+        if (!has.call(byDay, k) || !(byDay[k].gross > 0)) continue;
+        open++;
+        if (!best || byDay[k].net > best.net) best = byDay[k];
+        if (!slowest || byDay[k].net < slowest.net) slowest = byDay[k];
+      }
+      s.byChannel.forEach(function (x) { if (x.net > 0 && (!channel || x.net > channel.net)) channel = x; });
+      sell.by('route', f).rows.forEach(function (x) { if (x.routeId && x.net > 0 && (!route || x.net > route.net)) route = x; });
+      out.salesFacts = {
+        openDays: open,
+        average: open ? Math.round(s.net / open) : null,
+        best: best ? { date: best.date, net: best.net } : null,
+        slowest: slowest ? { date: slowest.date, net: slowest.net } : null,
+        channel: channel ? { channel: channel.channel, label: channel.label, net: channel.net, share: ratio(channel.net, s.net) } : null,
+        route: route ? { routeId: route.routeId, label: route.label, net: route.net, share: ratio(route.net, s.net) } : null
+      };
+    }
+
+    if (wMargin) {
+      var material = cost.cogs + cost.prodLoss + cost.writeoff + cost.countDiff;
+      points.forEach(function (p) { p.marginPct = p.netSales === null ? null : ratio(p.netSales - (p.materialCost || 0), p.netSales); });
+      out.margin = {
+        netSales: s.net, cogs: cost.cogs, prodLoss: cost.prodLoss, writeoff: cost.writeoff, countDiff: cost.countDiff, materialCost: material,
+        grossMargin: s.net - material, grossMarginPct: ratio(s.net - material, s.net), materialPct: ratio(material, s.net)
+      };
+    }
+
+    if (wReturns) {
+      var limitPct = HB.masters.limits.returnsPct;
+      points.forEach(function (p) { p.returnShare = ratio(p.returned || 0, p.supplied); });
+      /* above the limit as the engine tests a return: more than limitPct percent of what was supplied; exactly the limit is within it */
+      out.returns = { supplied: supplied, returned: returned, share: ratio(returned, supplied), limitPct: limitPct, over: supplied > 0 && returned * 100 > limitPct * supplied };
+    }
+
+    if (out.spend) {
+      var byUnit = exp.byUnit(f), byCat = exp.byCategory(f), amounts = {};
+      byUnit.rows.forEach(function (x) { amounts[x.unitId] = x.amount; });
+      /* the categories with spend in the range, the largest first; two of the same amount stay in master order */
+      var cats = byCat.rows.filter(function (x) { return x.amount !== 0; }).map(function (x) {
+        return { categoryId: x.categoryId, categoryName: x.categoryName, amount: x.amount, share: ratio(x.amount, byCat.totals.amount) };
+      }).sort(function (x, z) { return z.amount - x.amount; });
+      out.spendFacts = {
+        /* every location in scope, spent at or not, so that a bar keeps its place; a closed one only while it has spend in the range */
+        byLocation: HB.masters.units.filter(function (u) { return unitOk(c, u.id) && (u.active !== false || amounts[u.id] !== undefined); }).map(function (u) {
+          return { unitId: u.id, unitName: u.name, amount: amounts[u.id] || 0, share: ratio(amounts[u.id] || 0, byUnit.totals.amount) };
+        }),
+        byCategory: cats,
+        largest: cats.length && cats[0].amount > 0 ? cats[0] : null
+      };
+    }
+
+    if (wCash) {
+      /* the balance at the end of a day: the balance now, less every row dated after that day */
+      var balance = 0;
+      HB.masters.accounts.forEach(function (a) { if (accountOk(c, a.id)) balance += c.book.cash.balance[a.id] || 0; });
+      eachDay(D.addDays(to, 1), FAR, function (day) {
+        for (var j = 0; j < day.cash.length; j++) if (accountOk(c, day.cash[j].accountId)) balance -= day.cash[j].amount;
+      });
+      for (i = points.length - 1; i >= 0; i--) { points[i].cashBalance = balance; balance -= flow[i]; }
+    }
+  }
 
   function dashOf(c, from, to, period) {
     var f = { from: from, to: to }, out = { period: period, from: from, to: to, role: c.role, blocks: [] };
@@ -2546,12 +2730,13 @@
       put('receivables', {
         open: a.totals.open, credit: a.totals.credit, balance: a.totals.balance, overdue: a.totals.overdue,
         overdueRows: a.rows.filter(function (x) { return x.overdue > 0; }).sort(function (x, z) { return z.overdue - x.overdue; })
-          .map(function (x) { return { customerId: x.customerId, customerName: x.customerName, overdue: x.overdue, open: x.open, oldestDue: x.oldestDue, invoices: x.overdueItems }; })
+          .map(function (x) { return { customerId: x.customerId, customerName: x.customerName, overdue: x.overdue, open: x.open, oldestDue: x.oldestDue, invoices: x.overdueItems }; }),
+        buckets: bucketsOf(a.totals)
       });
     }
     if (sees('bills')) {
       var p = ap.balances(), claims = ap.toReimburse();
-      put('payables', { open: p.totals.open, overdue: p.totals.overdue, dueSoon: p.totals.dueSoon, dueRows: ap.dueWithin(), toReimburse: sumOf(claims, 'open'), claims: claims.length });
+      put('payables', { open: p.totals.open, overdue: p.totals.overdue, dueSoon: p.totals.dueSoon, dueRows: ap.dueWithin(), toReimburse: sumOf(claims, 'open'), claims: claims.length, buckets: bucketsOf(p.totals) });
     }
     if (sees('approvals')) {
       var w = approvals.pending();
@@ -2561,6 +2746,7 @@
     var near = stock.expiring(), expired = 0, soon = 0;
     near.forEach(function (x) { if (x.flag === 'expired') expired += x.qty; else soon += x.qty; });
     put('nearExpiry', { count: near.length, expiredUnits: expired, nearUnits: soon, rows: near });
+    dashRange(c, out, s);
     return out;
   }
 
@@ -2570,11 +2756,24 @@
   }
 
   var dash = {
-    /** The dashboard blocks of the business date, for the persona in use. */
+    /** The dashboard blocks of the business date, for the persona in use, and beside them its one point (dashRange). */
     today: function () { return memo('dash.today', undefined, function (c) { return dashOf(c, c.today, c.today, 'today'); }); },
 
-    /** The same blocks for the month to date: the first day of the business date's month to the business date. */
-    monthToDate: function () { return memo('dash.monthToDate', undefined, function (c) { return dashOf(c, D.monthStart(c.today), c.today, 'month'); }); },
+    /**
+     * The same blocks for a range, f = { from, to }: both days included, cut to go-live and the business date like
+     * every range (rangeOf); any other field of f is ignored. `period` says which range it is: 'month' for the month
+     * to date, 'range' for any other. Beside the blocks: days, grain, points, and with their blocks salesFacts, margin,
+     * returns and spendFacts (dashRange; docs/API.md 4.19). Remembered per range.
+     */
+    period: function (f) {
+      var r = rangeOf(f);
+      return memo('dash.period', r, function (c) {
+        return dashOf(c, r.from, r.to, r.from === D.monthStart(c.today) && r.to === c.today ? 'month' : 'range');
+      });
+    },
+
+    /** The same blocks for the month to date: `period` of the first day of the business date's month to the business date. */
+    monthToDate: function () { var today = HB.calendar.today; return dash.period({ from: D.monthStart(today), to: today }); },
 
     /**
      * Today's work: sheets to post, transfers to send and to confirm, orders due for receipt, production to

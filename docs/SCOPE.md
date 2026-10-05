@@ -1,7 +1,12 @@
 # Happy Bakers - Neo ERP (Tier 1) sample: scope
 
-v0.4, 3 October 2026. Status: **agreed. Nothing is open.**
+v0.5, 5 October 2026. Status: **agreed. Nothing is open.**
 
+- v0.5: the owner's decision of 5 October 2026 (decision 19): the app no longer explains itself. The
+  About page and the notes about the demo on its screens are removed, because prospects read them as
+  limits of the offering; what they said is in a handout given offline. On screen the product is a
+  "demo", not a "sample". The landing dashboard opens on a cockpit of tiles with small charts, and
+  every period figure follows the date range of the filter bar.
 - v0.4: the owner's decisions of 3 October 2026 (decisions 14 to 18): the load time is accepted as built;
   one action cancels a posted dispatch sheet; delivering less than a corporate order closes the order;
   a salary bill is always dated a month end; the system warns, without blocking, on figures that look
@@ -55,6 +60,7 @@ From the brief:
 | 16 | Part delivery | Delivering less than a corporate order closes the order; there is no back-order, and the form says so |
 | 17 | Salary bill | Always dated a month end. On another day, last month's bill is cancelled and raised again, and the cancellation shows in the current month |
 | 18 | Unusual figures | The system warns, without blocking, on figures that look wrong: a production entry whose good units are below about 80% or above about 105% of what the recipe expects for the mixes; a stock-count line that differs from the books by more than about a fifth (a difference that is trivial in absolute terms is ignored); an invoice line that delivers more than the corporate order has; a receipt above everything the customer owes, saying how much will stay on account; an expense claim well above what claims normally are; a purchase-order rate more than about a quarter away from the item's latest purchase price; and a store day-end whose cash plus UPI differ from the day's sales at MRP by more than about a tenth |
+| 19 | What the app says about itself | One line and nothing more: the foot of the sidebar reads "This is a Demo based on test data", and the brand reads "Happy Bakers" over "Neo ERP". The About page is removed, and so are the notes on the screens that said what the demo does not do (emails not sent, nothing filed, attendance and leave left out, no connection to Tally or Zoho Books): prospects read them as limits of the offering. What they said is in a three-page handout given offline (`docs/handout`, 4.11). On screen the product is a "demo", never a "sample"; the documents of the project keep their wording. The locked cards and the page of the higher tiers (4.12) stay |
 
 ## 3. The company
 
@@ -263,16 +269,21 @@ product margin.
   with a warning. The history is never warned about.
 - **Audit log**: who, in which role, when, what, before and after.
 - **Notification log**: the emails Neo ERP would send (approval requests, overdue receivables, bills
-  falling due, low stock, near-expiry), labelled "simulated in this sample - Neo ERP sends these by
-  email". Nothing is sent.
+  falling due, low stock, near-expiry). Nothing is sent. The handout says so; the screen carries no
+  note about it (decision 19).
 
 ### 4.10 Dashboard and reports
 
 Standard MIS, not analytics.
 
-- **Dashboard**: today and month to date - sales by channel, collections, production, cash and bank;
-  lists of pending approvals, low stock, near-expiry stock, overdue receivables and bills due this
-  week; spend this month by location.
+- **Dashboard**: today and a date range - sales by channel, collections, production and spend by
+  location. These period figures follow the date range of the filter bar, which is the month to date by
+  default, so that any earlier month can be looked at: one range at a time, never one set against
+  another. Cash and bank and the lists of pending approvals, low stock, near-expiry stock, overdue
+  receivables and bills due this week are as at the business date, whatever the range. The top of the
+  dashboard is a cockpit: net sales of the range as one large figure, the other figures as tiles, each
+  with a small chart of the days of that same range (its months when the range is long), and what
+  stands at the business date in a row under them; no tile shows a change against another period.
 - **Today's work**: dispatch sheets to post, store transfers to send and to confirm, purchase orders
   due for receipt today, production to record, store day-ends pending, approvals waiting. History runs
   to the day before the business date; the business date is the user's to run.
@@ -286,7 +297,14 @@ Standard MIS, not analytics.
 
 - **"Try this"**: six to eight short journeys as a checklist that ticks itself, for example "raise a
   flour order at a higher rate, receive it, and watch the bread cost and margin move".
-- **Reset** to a fresh copy dated today.
+- **Reset** to a fresh copy dated today, from the menu at the top right of every screen.
+- **Handout** (decision 19): a PDF of three pages for the people the demo is shared with - what the
+  demo shows and how to start, the eight journeys, what is in it, how its data works (test data, the
+  history since go-live, the business date, entries kept in the user's own browser, the fresh copy),
+  how it differs from a live system (connections, email alerts, user accounts, attendance and leave,
+  earlier history, GST) and the three offerings. It carries everything the app once said about itself.
+  Source `docs/handout/handout.html`; `node tools/handout.js` prints
+  `docs/handout/Happy-Bakers-demo-guide.pdf`. There is no About page.
 
 ### 4.12 Upgrade teasers
 
@@ -301,10 +319,10 @@ prospect would look for the feature:
 | Cash and bank | Bank feed and reconciliation; Tally or Zoho Books sync | iNeo |
 | Reports | Month-on-month and year-on-year dashboards | iNeo |
 | Dashboard | Sales forecast with suggested production; 30/60/90-day cash projection | NeoX |
-| People | Attendance and leave; tasks | Neo ERP - in the tier, not shown in this sample |
 
-The last row matters: tasks, attendance and leave are part of Tier 1 but not of this sample, and a
-prospect must not conclude that Neo ERP lacks them.
+Tasks, attendance and leave are part of Tier 1 but not of this demo. The handout says so, so that a
+prospect does not conclude that Neo ERP lacks them; the People screen carries no card for it
+(decision 19).
 
 ## 5. Out of scope
 

@@ -25,7 +25,7 @@
     'acc-receivables': 'arrow-down', 'acc-payables': 'arrow-up', 'acc-cash': 'bank', 'acc-pnl': 'chart', 'acc-margin': 'percent', 'acc-gst': 'shield-check',
     'reports': 'book',
     'masters-items': 'grid', 'masters-parties': 'user', 'masters-setup': 'settings',
-    'sys-audit': 'eye', 'sys-notifications': 'bell', 'sys-tiers': 'star', 'sys-about': 'info'
+    'sys-audit': 'eye', 'sys-notifications': 'bell', 'sys-tiers': 'star'
   };
   /*
    * Which page shows a document of each type. The type is the document's own (HB.data.doc.get) or, with no data
@@ -291,7 +291,7 @@
         teardown();
         ui.clear(els.page);
         els.page.appendChild(ui.errorCard('"' + page.title + '" could not be drawn', e,
-          'The rest of the sample keeps working. Pick another screen from the menu, or use "Fresh copy dated today" in the top-right menu if this persists.'));
+          'The rest of the demo keeps working. Pick another screen from the menu, or use "Fresh copy dated today" in the top-right menu if this persists.'));
       }
       els.page.style.minHeight = '';
       /* A page that drew a full-page document (a docForm or a docView as its first element) is not showing a list:

@@ -104,8 +104,8 @@
     /* why a copy opened today is not dated today; '' on an ordinary day. `what` is "this copy" or "a fresh copy". */
     function why(what) {
       if (fresh === real) return '';
-      if (real < cal.minDate) return ' The sample starts on ' + dayLabel(cal.minDate) + ', so ' + what + ' is dated that day.';
-      if (real > cal.maxDate) return ' The sample\'s history ends on ' + dayLabel(cal.maxDate) + ', so ' + what + ' is dated that day.';
+      if (real < cal.minDate) return ' The demo starts on ' + dayLabel(cal.minDate) + ', so ' + what + ' is dated that day.';
+      if (real > cal.maxDate) return ' The demo\'s history ends on ' + dayLabel(cal.maxDate) + ', so ' + what + ' is dated that day.';
       return ' The factory is closed today, so ' + what + ' is dated ' + dayLabel(fresh) + ', the next working day.';
     }
     if (cal.movedOn()) {
@@ -171,7 +171,7 @@
     var realDay = HB.calendar.clamp(HB.calendar.realToday()), isToday = realDay === HB.calendar.realToday();
     return ui.confirm({
       title: isToday ? 'Start a fresh copy dated today?' : 'Start a fresh copy dated ' + dayLabel(realDay) + '?',
-      message: 'Everything you entered in this copy is discarded, and the sample starts again with ' + dayLabel(realDay) +
+      message: 'Everything you entered in this copy is discarded, and the demo starts again with ' + dayLabel(realDay) +
         ' as its business date. The history is built again up to the day before. This cannot be undone.',
       confirmLabel: 'Start a fresh copy', tone: 'danger'
     }).then(function (res) {
@@ -200,17 +200,17 @@
     var nav = h('nav', { 'class': 'mk-nav', 'aria-label': 'Screens' });
     ui.append(ui.clear(sidebar),
       h('div', { 'class': 'mk-brand' },
-        /* the Neo ERP mark (The Biz CFO's artwork, vendor/brand): the product this sample shows */
+        /* the Neo ERP mark (The Biz CFO's artwork, vendor/brand): the product this demo shows */
         h('img', { 'class': 'mk-brand__logo', src: 'vendor/brand/neo-erp-mark.png', alt: '', width: '32', height: '31' }),
         h('div', { 'class': 'mk-brand__text' },
           h('div', { 'class': 'mk-brand__name' }, 'Happy Bakers'),
-          h('div', { 'class': 'mk-brand__tag' }, 'Neo ERP sample'))),
+          h('div', { 'class': 'mk-brand__tag' }, 'Neo ERP'))),
       nav,
       h('div', { 'class': 'mk-sidebar__foot' },
         h('div', { 'class': 'mk-sidebar__by' },
           h('span', null, 'Neo ERP by'),
           h('img', { 'class': 'mk-sidebar__bizcfo', src: 'vendor/brand/thebizcfo-logo-white-strip.png', alt: 'The Biz CFO', width: '97', height: '16' })),
-        h('div', { 'class': 'mk-sidebar__note' }, ui.icon('info', 14), h('span', null, 'A sample on invented data. Happy Bakers is fictional.'))));
+        h('div', { 'class': 'mk-sidebar__note' }, ui.icon('info', 14), h('span', null, 'This is a Demo based on test data'))));
     return nav;
   }
 
@@ -229,7 +229,7 @@
     }
     function openRoleMenu() {
       var me = HB.session.current();
-      var items = [{ heading: 'Work in the sample as' }].concat(HB.session.users.map(function (u) {
+      var items = [{ heading: 'Work as' }].concat(HB.session.users.map(function (u) {
         return { label: u.name, sub: u.roleLabel, avatar: u.initials, selected: u.id === me.id, onSelect: function () {
           if (u.id === HB.session.current().id) return;
           HB.session.set(u.id);
@@ -334,7 +334,7 @@
       else filterBar.hidden = true;
     });
 
-    if (failure) banner('engine', { tone: 'critical', text: 'The sample data could not be built (' + failure + '). Screens may be empty or wrong; a fresh copy usually clears it.', action: { label: 'Start a fresh copy', onClick: function () { freshCopy(); } } });
+    if (failure) banner('engine', { tone: 'critical', text: 'The demo data could not be built (' + failure + '). Screens may be empty or wrong; a fresh copy usually clears it.', action: { label: 'Start a fresh copy', onClick: function () { freshCopy(); } } });
     refreshBanners();
     /* a failed write, a skipped entry after a later rebuild, a new business date: each can change what the banners say */
     HB.bus.on('store:changed', refreshBanners);

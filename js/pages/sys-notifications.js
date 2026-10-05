@@ -53,13 +53,6 @@
     render: function (rootEl, ctx) {
       var st = ctx.state, list = HB.data.notify.list();            /* newest first: call, draw, forget */
       st.list = st.list || {};
-      var placeholder = list.some(function (n) { return n.placeholder; });
-
-      rootEl.appendChild(ui.callout('info', 'Simulated in this sample. Neo ERP sends these by email.', [
-        'Nothing is sent from this sample. The list is worked out from the books as they stand on ' + ui.format('date', HB.calendar.today) +
-        ': when a document is approved, an invoice collected, a bill paid or the stock replenished, its entry leaves the list.',
-        placeholder ? ' The email addresses are made up.' : ''
-      ], { actions: ui.statusChip('SIMULATED') }));
 
       rootEl.appendChild(forms.docList({
         state: st.list, rows: list, columns: COLUMNS,

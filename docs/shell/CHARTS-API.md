@@ -13,6 +13,8 @@ Inherited from the previous sample and renamed to `HB`. What differs here is lis
   palette of its own: use `colourFor('series', index)` and keep charts few and plain (month-wise bars, this month by
   day - SPEC section 9). There is no chart styleguide page here; the previous sample has one.
 - No chart shows a change against another period, and there is no simulated loading.
+- `sparkline` has four more options, for the small charts in the tiles of the landing dashboard (section 6): `fluid`,
+  `lineVar`, `strokeWidth` and `labels`. Without them it draws what it always drew.
 
 ```js
 HB.charts.mount(parent, spec)        -> controller { el, update(partialSpec), dispose() }
@@ -388,8 +390,41 @@ HB.charts.sparkline(cell, weeklySales, {
 });
 ```
 
-1.5px line in `--series-muted`; `null` values break the line; a flat series is drawn mid-height; an
-empty series is a faint baseline. `role="img"` with an aria-label "first to last (change)".
+1.5px line in `--series-muted`; `null` values break the line (a value with a gap on both sides is a
+small mark of its own); a flat series is drawn mid-height; an empty series is a faint baseline.
+`role="img"` with an aria-label "first to last (change)".
+
+**In a tile** (the landing dashboard, the one screen of this sample that draws one): four more options.
+
+```js
+HB.charts.sparkline(box, points.map(function (p) { return p.whole ? p.netSales : null; }), {
+  fluid: true,                     // the line takes the width of its container
+  height: 48, width: 300,          // height in px; width is then only the precision of the drawing
+  strokeWidth: 2,                  // the weight of the line (default 1.5)
+  lineVar: '--series-1',           // the colour token of the line (default the de-emphasis grey)
+  colourVar: '--series-1',         // the end dot
+  format: 'inr', label: 'Net sales by day, 1 Sep - 30 Sep 2026',
+  labels: points.map(function (p) { return p.label; })   // the name of each point: '1 Sep', 'Oct 2026'
+});
+```
+
+- `fluid`: the svg is stretched sideways to the width of its container (`display: block`, inset by the
+  overhang of the end dot, so the dot stays inside a tile's padding). Strokes keep their weight and the end
+  dot stays round: it is 8px across in a 2px ring of the surface colour. The line runs from the left edge
+  to the right edge of the box; with one value there is only the dot.
+- `labels`: with them the aria-label names what the line shows, in words and with no change between two
+  points: "`label`: first ₹1.16 L (1 Oct), last ₹1.07 L (4 Oct), highest ₹1.23 L (3 Oct)"; with one value,
+  that value and its name. And a fluid line gets its hover layer: a hairline snaps to the point nearest
+  the pointer, a small dot marks it on the line, and a readout beside it gives the value first and the
+  name under it (`.mk-sparktip`). The whole box is the target. A point whose value is `null` is skipped:
+  the readout takes the nearest one that has a value. There is one readout for the page: it goes, with its
+  marks, when the pointer leaves or reads another line, when anything scrolls, when the line is clicked, and
+  when the screen is drawn again (`disposeAll`, or the next sparkline).
+- No axis and no legend: one series, named by the tile it stands in, whose figure carries the amount.
+  The values behind the line are on the screen the tile opens.
+
+A sparkline shows the values it is given and nothing else. On the dashboard those are the days of the
+chosen range, or its months: never a figure of another period (SPEC section 8).
 
 ---
 
@@ -428,7 +463,9 @@ you need the computed colour.
 
 `.mk-chart` (card) - modifiers `.mk-chart--bare`, `.is-table`; attribute `data-kind`. Parts:
 `__head`, `__title`, `__subtitle`, `__tools`, `__controls`, `__seg`, `__legend`, `__body`, `__plot`,
-`__table`, `__empty`, `__note`. Tooltip: `.mk-tip`. Sparkline: `.mk-spark`. Do not restyle these from
+`__table`, `__empty`, `__note`. Tooltip: `.mk-tip`. Sparkline: `.mk-spark` (`.mk-spark--fluid` when it
+fills its container; parts `__line`, `__dot`, and for a fluid one `__ring`, `__end`, `__cross`, `__probe`,
+`__hit`; its readout is `.mk-sparktip`, appended to `<body>` while the pointer is on a line). Do not restyle these from
 page CSS; change `css/charts.css`. The segmented control (`__seg`, `__segbtn`) takes its look from the
 rules of `HB.ui.segmented` in `css/components.css` (shared selectors), so a chart control and a
 `ui.segmented` next to it are identical. `.mk-chart__legend.has-toggles` marks a legend that stays

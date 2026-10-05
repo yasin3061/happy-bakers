@@ -71,8 +71,6 @@
       var net = g.net.tax, which = net > 0 ? 'Output is above input' : (net < 0 ? 'Input is above output' : 'Output and input are equal');
 
       ui.append(rootEl,
-        ui.callout('info', 'Nothing is filed from this sample',
-          'This summary adds up the GST on the documents dated in the range, rate by rate, for you to check your own return against. No return, e-invoice or e-way bill leaves the sample.'),
         ui.sectionTitle('GST for ' + range, null,
           ui.button({ label: 'CSV', icon: 'download', size: 'sm', onClick: function () { csv(g); } })),
         ui.kpiRow([

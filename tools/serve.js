@@ -320,7 +320,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.on('clientError', (err, socket) => { if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n'); });
-server.listen(PORT, () => console.log('Happy Bakers sample listening on port ' + PORT + ' (http://localhost:' + PORT + ') - ' +
+server.listen(PORT, () => console.log('Happy Bakers demo listening on port ' + PORT + ' (http://localhost:' + PORT + ') - ' +
   (USERS ? 'sign-in required, ' + USERS.length + (USERS.length === 1 ? ' user' : ' users') + ' on file' : 'OPEN: no sign-in (LOGIN=off)')));
 
 /* a platform stops a container with SIGTERM: finish what is in flight, then leave */

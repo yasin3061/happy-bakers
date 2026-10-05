@@ -3,6 +3,10 @@
  * State lives inside the 'prefs' store key and every change emits 'filters:changed'.
  * Every date preset is relative to HB.calendar.today (the business date of this copy), never the device clock.
  * The data layer is optional: units come from HB.masters when present, else HB.config, else there is no unit control.
+ *
+ * The date control is built so that an earlier month is one click away: the From and To dates stand in the bar and can
+ * be typed, the period button lists every month since go-live, and the two arrows step a month (or a range of days)
+ * back and forward.
  */
 (function (root) {
   'use strict';
@@ -12,18 +16,48 @@
   var ui = HB.ui, h = ui.h, D = HB.dates;
 
   var PRESETS = [
-    { id: 'today', label: 'Today' },
-    { id: 'yesterday', label: 'Yesterday' },
-    { id: 'last7', label: 'Last 7 days' },
     { id: 'thisMonth', label: 'This month' },
     { id: 'lastMonth', label: 'Last month' },
+    { id: 'last7', label: 'Last 7 days' },
+    { id: 'last30', label: 'Last 30 days' },
+    { id: 'today', label: 'Today' },
+    { id: 'yesterday', label: 'Yesterday' },
     { id: 'sinceGoLive', label: 'Since go-live' },
-    { id: 'custom', label: 'Custom range' }
+    { id: 'month', label: 'One month' },      /* a named month: state.month = 'YYYY-MM' */
+    { id: 'custom', label: 'Custom range' }   /* state.from, state.to */
   ];
+  var QUICK = ['thisMonth', 'lastMonth', 'last7', 'last30', 'today', 'yesterday', 'sinceGoLive'];
   var DEFAULT_PRESET = 'thisMonth';
   var UNIT = { key: 'unitIds', all: 'All locations', title: 'Locations', icon: 'store' };
 
+  function isPreset(id) { return PRESETS.some(function (p) { return p.id === id; }); }
   function clampDate(iso) { return D.max(HB.calendar.goLive, D.min(HB.calendar.today, iso)); }
+  function inRange(iso) { return D.isIso(iso) && iso >= HB.calendar.goLive && iso <= HB.calendar.today; }
+
+  /* -------------------------------------------------------------- months */
+
+  function isMonthKey(s) { return typeof s === 'string' && /^\d{4}-\d{2}$/.test(s) && D.isIso(s + '-01'); }
+  function clampMonth(key) {
+    var lo = D.monthKey(HB.calendar.goLive), hi = D.monthKey(HB.calendar.today);
+    return key < lo ? lo : (key > hi ? hi : key);
+  }
+  function shiftMonth(key, n) {
+    var y = +key.slice(0, 4), m = +key.slice(5, 7) - 1 + n;
+    y += Math.floor(m / 12);
+    m = ((m % 12) + 12) % 12;
+    return y + '-' + (m < 9 ? '0' : '') + (m + 1);
+  }
+  /** Every month from the business date's back to go-live, newest first: ['2026-10', '2026-09', ...]. */
+  function months() {
+    var out = [], key = D.monthKey(HB.calendar.today), lo = D.monthKey(HB.calendar.goLive);
+    while (key >= lo) { out.push(key); key = shiftMonth(key, -1); }
+    return out;
+  }
+  /** The range a month covers in this copy: its first day to its last, or to the business date in the current month. */
+  function monthRange(key) {
+    var from = clampDate(key + '-01');
+    return { from: from, to: clampDate(D.monthEnd(key + '-01')) };
+  }
 
   /* ------------------------------------------------------------- options */
 
@@ -55,21 +89,28 @@
 
   /* --------------------------------------------------------------- dates */
 
-  function rangeFor(presetId, custom) {
+  /** rangeFor(presetId, {from, to, month}) -> {from, to}, always inside go-live .. business date and in order. */
+  function rangeFor(presetId, st) {
     var today = HB.calendar.today;
     var from, to = today;
     switch (presetId) {
       case 'today': from = today; break;
       case 'yesterday': from = to = D.addDays(today, -1); break;
       case 'last7': from = D.addDays(today, -6); break;
+      case 'last30': from = D.addDays(today, -29); break;
       case 'lastMonth':
         to = D.addDays(D.monthStart(today), -1);
         from = D.monthStart(to);
         break;
       case 'sinceGoLive': from = HB.calendar.goLive; break;
+      case 'month':
+        var key = clampMonth(st && isMonthKey(st.month) ? st.month : D.monthKey(today));
+        from = key + '-01';
+        to = D.monthEnd(from);
+        break;
       case 'custom':
-        from = custom && D.isIso(custom.from) ? custom.from : D.monthStart(today);
-        to = custom && D.isIso(custom.to) ? custom.to : today;
+        from = st && D.isIso(st.from) ? st.from : D.monthStart(today);
+        to = st && D.isIso(st.to) ? st.to : today;
         break;
       default: from = D.monthStart(today);
     }
@@ -87,14 +128,15 @@
 
   /* --------------------------------------------------------------- state */
 
-  function blank() { return { preset: DEFAULT_PRESET, from: null, to: null, unitIds: null }; }
+  function blank() { return { preset: DEFAULT_PRESET, from: null, to: null, month: null, unitIds: null }; }
 
   function load() {
     var saved = (HB.store.get('prefs', {}) || {}).filters || {};
     var s = blank();
-    if (PRESETS.some(function (p) { return p.id === saved.preset; })) s.preset = saved.preset;
+    if (isPreset(saved.preset)) s.preset = saved.preset;
     if (D.isIso(saved.from)) s.from = saved.from;
     if (D.isIso(saved.to)) s.to = saved.to;
+    if (isMonthKey(saved.month)) s.month = saved.month;
     if (Array.isArray(saved.unitIds) && saved.unitIds.length) s.unitIds = saved.unitIds.slice();
     return s;
   }
@@ -103,7 +145,7 @@
 
   function persist() {
     var prefs = HB.store.get('prefs', {}) || {};
-    prefs.filters = { preset: state.preset, from: state.from, to: state.to, unitIds: state.unitIds };
+    prefs.filters = { preset: state.preset, from: state.from, to: state.to, month: state.month, unitIds: state.unitIds };
     HB.store.set('prefs', prefs);
   }
 
@@ -112,10 +154,17 @@
     return { from: r.from, to: r.to, unitIds: clean(state.unitIds, unitOptions()), preset: state.preset };
   }
 
-  /** set({preset}) | set({from, to}) (implies preset 'custom') | set({unitIds}) - null means every unit in scope. */
+  /**
+   * set({preset}) | set({preset: 'month', month: 'YYYY-MM'}) | set({from, to}) (implies preset 'custom') |
+   * set({unitIds}) - null means every unit in scope.
+   */
   function set(partial) {
     partial = partial || {};
-    if (partial.preset && PRESETS.some(function (p) { return p.id === partial.preset; })) state.preset = partial.preset;
+    if (partial.preset && isPreset(partial.preset)) state.preset = partial.preset;
+    if (partial.month !== undefined && isMonthKey(partial.month)) {
+      state.month = clampMonth(partial.month);
+      if (!partial.preset) state.preset = 'month';
+    }
     if (partial.from !== undefined || partial.to !== undefined) {
       if (!partial.preset) state.preset = 'custom';
       var r = rangeFor('custom', { from: partial.from || state.from, to: partial.to || state.to });
@@ -160,6 +209,41 @@
     return rangeLabel(f) + ', ' + daysText(f);
   }
 
+  /** What the period button says: the preset's name, or the month by name ("Sep 2026"). */
+  function periodLabel(f) {
+    if (f.preset === 'month') return D.monthLabel(D.monthKey(f.from), true);
+    var p = PRESETS.filter(function (x) { return x.id === f.preset; })[0];
+    return p ? p.label : '';
+  }
+
+  /* ---------------------------------------------------------------- step */
+
+  /** The range is one calendar month (the current month counts while it runs to the business date). */
+  function isMonthRange(f) {
+    if (f.preset === 'thisMonth' || f.preset === 'lastMonth' || f.preset === 'month') return true;
+    return D.monthStart(f.from) === f.from && D.monthEnd(f.from) === f.to;
+  }
+
+  function canStep(dir) {
+    var f = get();
+    return dir < 0 ? f.from > HB.calendar.goLive : f.to < HB.calendar.today;
+  }
+
+  /** step(-1) | step(1): a month range moves by one month, any other range by its own length in days. */
+  function step(dir) {
+    if (!canStep(dir)) return;
+    var f = get();
+    if (isMonthRange(f)) {
+      var key = clampMonth(shiftMonth(D.monthKey(f.from), dir < 0 ? -1 : 1));
+      if (key === D.monthKey(HB.calendar.today)) set({ preset: DEFAULT_PRESET }); else set({ preset: 'month', month: key });
+      return;
+    }
+    var n = D.diffDays(f.from, f.to) + 1, from, to;
+    if (dir < 0) { to = D.addDays(f.from, -1); from = D.addDays(to, -(n - 1)); }
+    else { from = D.addDays(f.to, 1); to = D.addDays(from, n - 1); }
+    set({ from: clampDate(from), to: clampDate(to) });
+  }
+
   /* ----------------------------------------------------------------- bar */
 
   var mounted = null; /* {container, showList, refresh} */
@@ -173,36 +257,29 @@
   }
 
   function openDatePopover(anchor) {
-    var pop = null;
-    var current = get();
-    var fromInput = ui.form.dateInput({ value: current.from, min: HB.calendar.goLive, max: HB.calendar.today, ariaLabel: 'From date' });
-    var toInput = ui.form.dateInput({ value: current.to, min: HB.calendar.goLive, max: HB.calendar.today, ariaLabel: 'To date' });
-    var error = h('div', { 'class': 'mk-field__error', style: { gridColumn: '1 / -1' } });
-    error.hidden = true;
-    var custom = h('div', { 'class': 'mk-menu__custom' },
-      h('label', null, 'From', fromInput), h('label', null, 'To', toInput), error,
-      ui.button({ label: 'Apply range', variant: 'primary', size: 'sm', onClick: function () {
-        if (!D.isIso(fromInput.value) || !D.isIso(toInput.value)) { error.hidden = false; ui.clear(error).appendChild(root.document.createTextNode('Pick both dates')); return; }
-        if (pop) pop.close();
-        set({ preset: 'custom', from: fromInput.value, to: toInput.value });
-      } }));
-    custom.hidden = current.preset !== 'custom';
-
-    var rows = PRESETS.map(function (p) {
-      var selected = p.id === current.preset;
-      var row = menuRow({
-        label: p.label, tick: true, autofocus: selected,
-        hint: p.id === 'custom' ? null : rangeLabel(rangeFor(p.id)),
-        onClick: function () {
-          if (p.id === 'custom') { custom.hidden = false; if (pop) pop.reposition(); fromInput.focus(); return; }
-          if (pop) pop.close();
-          set({ preset: p.id });
-        }
-      });
-      if (selected) { row.classList.add('is-selected'); row.lastChild.appendChild(ui.icon('check')); }
-      return row;
+    var pop = null, current = get(), focused = false;
+    function pick(partial) { if (pop) pop.close(); set(partial); }
+    function row(label, hint, selected, partial) {
+      var r = menuRow({ label: label, hint: hint, tick: true, autofocus: selected && !focused, onClick: function () { pick(partial); } });
+      if (selected) { focused = true; r.classList.add('is-selected'); r.lastChild.appendChild(ui.icon('check')); }
+      return r;
+    }
+    var quick = QUICK.map(function (id) {
+      var p = PRESETS.filter(function (x) { return x.id === id; })[0];
+      return row(p.label, rangeLabel(rangeFor(id)), current.preset === id, { preset: id });
     });
-    pop = ui.popover(anchor, [h('div', { 'class': 'mk-menu__heading' }, 'Date range'), rows, custom], { width: 300 });
+    var thisMonth = D.monthKey(HB.calendar.today);
+    var byMonth = months().map(function (key) {
+      var r = monthRange(key), selected = current.from === r.from && current.to === r.to;
+      /* the current month is the default range: picking it leaves nothing to reset */
+      return row(D.monthLabel(key, true), key === thisMonth ? 'to ' + D.label(r.to, 'd MMM') : null, selected,
+        key === thisMonth ? { preset: DEFAULT_PRESET } : { preset: 'month', month: key });
+    });
+    pop = ui.popover(anchor, [
+      h('div', { 'class': 'mk-menu__heading' }, 'Range'), quick,
+      h('div', { 'class': 'mk-menu__sep', role: 'separator' }),
+      h('div', { 'class': 'mk-menu__heading' }, 'Month'), byMonth
+    ], { width: 280 });
   }
 
   function openUnitPopover(anchor) {
@@ -253,15 +330,39 @@
     container.setAttribute('aria-label', 'Filters');
 
     var updaters = [];
+    var refresh = function () {};
     if (show.indexOf('date') !== -1) {
+      var stepBtn = function (icon, label, dir) {
+        return h('button', { type: 'button', 'class': 'mk-fstep', 'aria-label': label, title: label, onClick: function () { step(dir); } }, ui.icon(icon, 16));
+      };
+      var prevBtn = stepBtn('chevron-left', 'Earlier', -1), nextBtn = stepBtn('chevron-right', 'Later', 1);
       var dateValue = h('span', { 'class': 'mk-fctl__val' });
       var dateBtn = h('button', { type: 'button', 'class': 'mk-fctl', onClick: function () { openDatePopover(dateBtn); } }, ui.icon('calendar'), dateValue, ui.icon('chevron-down', 14));
-      container.appendChild(dateBtn);
+
+      /* A typed date counts once it is a whole date inside go-live .. business date. A native date box reports
+         half-typed years (0002, 0020, ...) as changes: those are out of range and are left alone until the date is done. */
+      var applyTyped = function () {
+        var a = fromInput.value, b = toInput.value, cur = get();
+        if (!inRange(a) || !inRange(b) || (a === cur.from && b === cur.to)) return;
+        set({ from: a, to: b });
+      };
+      var fromInput = ui.form.dateInput({ min: HB.calendar.goLive, max: HB.calendar.today, ariaLabel: 'From date', onChange: applyTyped });
+      var toInput = ui.form.dateInput({ min: HB.calendar.goLive, max: HB.calendar.today, ariaLabel: 'To date', onChange: applyTyped });
+      /* leaving a box puts back what stands, so a date that was not taken never stays on screen */
+      [fromInput, toInput].forEach(function (el) { el.addEventListener('blur', function () { refresh(); }); });
+
+      container.appendChild(h('span', { 'class': 'mk-fgroup' }, prevBtn, dateBtn, nextBtn));
+      container.appendChild(h('label', { 'class': 'mk-fdate' }, h('span', null, 'From'), fromInput));
+      container.appendChild(h('label', { 'class': 'mk-fdate' }, h('span', null, 'To'), toInput));
       updaters.push(function (f) {
-        var preset = PRESETS.filter(function (p) { return p.id === f.preset; })[0];
-        dateValue.textContent = f.preset === 'custom' ? rangeLabel(f) : preset.label;
+        dateValue.textContent = periodLabel(f);
         dateBtn.classList.toggle('is-set', f.preset !== DEFAULT_PRESET);
-        dateBtn.setAttribute('aria-label', 'Date range: ' + dateValue.textContent);
+        dateBtn.setAttribute('aria-label', 'Period: ' + dateValue.textContent + ', ' + rangeLabel(f));
+        var active = root.document.activeElement;
+        if (active !== fromInput) fromInput.value = f.from;
+        if (active !== toInput) toInput.value = f.to;
+        prevBtn.disabled = !canStep(-1);
+        nextBtn.disabled = !canStep(1);
       });
     }
     if (show.indexOf('unit') !== -1) {
@@ -287,13 +388,13 @@
     container.appendChild(h('span', { 'class': 'mk-filterbar__spacer' }));
     if (show.indexOf('date') !== -1) container.appendChild(rangeText);
 
-    function refresh() {
+    refresh = function () {
       var f = get();
       updaters.forEach(function (fn) { fn(f); });
       resetBtn.hidden = isDefault(show);
-      /* a custom range is already written out on its control: beside it, only how long it is */
-      rangeText.textContent = f.preset === 'custom' ? daysText(f) : describe();
-    }
+      /* the dates themselves stand in the From and To boxes: beside them, only how long the range is */
+      rangeText.textContent = daysText(f);
+    };
     mounted = { container: container, showList: show, refresh: refresh };
     refresh();
   }
@@ -316,9 +417,14 @@
   });
 
   HB.filters = {
-    get: get, set: set, reset: reset, mountBar: mountBar, isDefault: isDefault, describe: describe,
-    options: options, summary: summary,
-    presets: function () { return PRESETS.map(function (p) { var r = p.id === 'custom' ? null : rangeFor(p.id); return { id: p.id, label: p.label, from: r && r.from, to: r && r.to }; }); },
+    get: get, set: set, reset: reset, step: step, canStep: canStep, mountBar: mountBar, isDefault: isDefault, describe: describe,
+    options: options, summary: summary, months: months,
+    presets: function () {
+      return PRESETS.map(function (p) {
+        var r = p.id === 'custom' || p.id === 'month' ? null : rangeFor(p.id);
+        return { id: p.id, label: p.label, from: r && r.from, to: r && r.to };
+      });
+    },
     range: function (presetId) { return rangeFor(presetId, state); },
     rangeLabel: rangeLabel
   };

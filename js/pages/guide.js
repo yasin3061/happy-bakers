@@ -11,8 +11,6 @@
   if (!HB || !HB.router || !HB.ui || !HB.forms) return;
   var ui = HB.ui, h = ui.h, fmt = HB.fmt;
 
-  var ABOUT = '#/system/about';
-
   function of(n, total, one, many) { return fmt.num(n) + ' of ' + fmt.num(total) + ' ' + (total === 1 ? one : many); }
   function pageOf(route) {
     var base = String(route || '').split('?')[0];
@@ -85,15 +83,14 @@
   function intro(list, me) {
     var done = list.filter(function (j) { return j.done; }).length, owner = ownerUser(), isOwner = me.role === 'owner';
     return ui.card({
-      title: 'Try this', subtitle: 'Short journeys through the sample. A step ticks itself when you post the entry it asks for, and the figures move as you go.',
+      title: 'Try this', subtitle: 'Short journeys through the demo. A step ticks itself when you post the entry it asks for, and the figures move as you go.',
       body: ui.stack([
         ui.meter({ value: done, max: list.length, tone: done ? 'good' : 'neutral', label: 'Journeys done', valueLabel: of(done, list.length, 'journey', 'journeys') }),
         ui.callout('info', 'The Owner can do every step', [
           'Each step names the person who does it in the business. Switch to that person to see the screens as their role sees them, or stay as the Owner throughout: an entry the Owner makes ticks the step just the same. ',
           'You are ' + me.name + ', ' + me.roleLabel + '.'
         ], { actions: owner && !isOwner ? ui.button({ label: 'Switch to the Owner', icon: 'user', size: 'sm', onClick: function () { become(owner); } }) : null }),
-        h('div', { 'class': 'mk-small mk-muted pg-guide__fresh' }, 'To clear the ticks and start again, take a fresh copy dated today: ',
-          screenLink('About this sample', ABOUT, me, null))
+        h('div', { 'class': 'mk-small mk-muted pg-guide__fresh' }, 'To clear the ticks and start again, choose "Fresh copy dated today" in the top-right menu.')
       ], 3)
     });
   }

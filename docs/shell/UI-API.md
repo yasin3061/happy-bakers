@@ -137,18 +137,22 @@ State lives in `prefs.filters`; every change emits `filters:changed` with the ne
 
 | Preset id | Label | Range |
 |---|---|---|
-| `today` | Today | the business date |
-| `yesterday` | Yesterday | the day before |
-| `last7` | Last 7 days | the business date and the six days before |
 | `thisMonth` (default) | This month | first of the month to the business date |
 | `lastMonth` | Last month | the whole month before |
+| `last7` | Last 7 days | the business date and the six days before |
+| `last30` | Last 30 days | the business date and the 29 days before |
+| `today` | Today | the business date |
+| `yesterday` | Yesterday | the day before |
 | `sinceGoLive` | Since go-live | 1 Jan 2026 to the business date |
-| `custom` | Custom range | two dates, picked |
+| `month` | the month by name, "Sep 2026" | one named month since go-live (`month: 'YYYY-MM'`); the current month runs to the business date |
+| `custom` | Custom range | two dates, typed in the From and To boxes |
 
 | call | meaning |
 |---|---|
 | `get()` | `{from, to, unitIds, preset}`; ISO dates; `unitIds` an array of unit ids or `null` = every unit in the persona's scope. A selection that covers every option is normalised to `null` |
-| `set(partial)` | `{preset}`; `{from, to}` implies `custom`; `{unitIds: [...] \| null}` |
+| `set(partial)` | `{preset}`; `{preset: 'month', month: 'YYYY-MM'}`; `{from, to}` implies `custom`; `{unitIds: [...] \| null}` |
+| `step(-1 \| 1)` / `canStep(dir)` | move the range earlier or later: a month range by one month, any other range by its own length in days; never before go-live or past the business date |
+| `months()` | every month from the business date's back to go-live, newest first: `['2026-10', '2026-09', ...]` |
 | `reset()` | back to This month / all units |
 | `isDefault(showList?)` | true when the listed controls are at their defaults |
 | `describe()` | `'1 Oct - 2 Oct 2026, 2 days'` - handy as a card subtitle |
@@ -164,8 +168,12 @@ var rows = HB.data.sell.invoices(f);                   // selectors take the fil
 HB.filters.set({ unitIds: ['st_vvn'] });               // drill-through, then navigate
 HB.filters.set({ from: '2026-08-01', to: '2026-08-31' });
 ```
-Behaviour: the date control is a popover of presets (bold + tick on the selected one; Custom shows two date inputs limited to
-go-live .. business date). The unit control is a checkbox popover with an "All locations" row; changes apply live. A persona with
+Behaviour: the date control is built so that an earlier month is one click away. In the bar, left to right: an arrow that
+steps the range earlier, the period button, an arrow that steps it later, then the From and To dates in two boxes that can be
+typed or picked (limited to go-live .. business date; a half-typed or out-of-range date is ignored and the box goes back to
+what stands when it is left), and at the right end how many days the range covers. The period button opens a list in two
+parts: the ranges above, each with its dates, and every month since go-live by name, newest first (bold + tick on what is
+selected). The unit control is a checkbox popover with an "All locations" row; changes apply live. A persona with
 one unit (the store manager) sees a locked chip; with no units known there is no unit control. On a persona switch, units the new
 persona cannot see are dropped. "Reset filters" appears only when a shown control is non-default. A value set on one screen stays
 in the global state, but it only reaches pages that declare that dimension.
@@ -210,6 +218,12 @@ into `root`. A document with lines takes the whole page (4.6, 4.7); when it must
 
 No tile, table or chart shows a change against another period (SPEC section 8): pass no `delta` and no `spark` to a tile. The kit
 still accepts them only because the inherited chart wrapper shares the code.
+
+The one exception is the landing dashboard, whose tiles carry a small chart of the days (or months) of the chosen range. It does
+not use the `spark` option, which draws a fixed 96px line with no label: `js/pages/home.js` makes the tile with `statTile`, builds
+the chart with `HB.charts.sparkline(box, values, { fluid: true, labels: [...] })` (CHARTS-API section 6) and appends it to the tile,
+where it stands at the foot. A tile is a flex column, so what is appended follows the small line; `margin-top: auto` on it (page
+CSS, on the page's own class) puts the charts of a row in line.
 
 ### 3.4 Table
 `table({columns, rows, onRowClick, dense, footer, empty, sortable, sort, onSort, maxHeight, rowClass, caption, className})`
@@ -636,7 +650,7 @@ the element has `.value` (the selected id) and `.filter(rows)` (the rows of the 
 | `postedToast(doc \| [docs], text, {verb, tone, duration})` | "Purchase order PO-U-0003 approved" with **one line of what moved** (`text`, written by the page from what the engine and the selectors returned) and a link to the document. It stays 6.5 to 14 seconds, longer for a longer line. The verb follows the status the document landed in (posted, approved, submitted for approval, held for approval, sent, saved); a held or pending one is amber. An array gives "12 invoices posted" |
 | `fail(errorOrResult, title?)` | a refusal as a red toast: the message, and a link to `error.docId` when the engine names the document to cancel first. For actions taken from a document view (approve, cancel, confirm receipt) |
 | `confirmWithReason({title, message, body, confirmLabel, cancelLabel, tone, reasonLabel, reasonPlaceholder})` | `Promise<{ok, reason}>`: a modal that does not confirm until a reason is typed - for reject and cancel |
-| `teaser({title, tier: 'iNeo' \| 'NeoX' \| 'Neo ERP', text, link, href})` | the locked card of SCOPE 4.12: one line, no figures, placed where a prospect would look for the feature. `'Neo ERP'` is for what the tier includes and this sample leaves out. `link: false` leaves out the link to `#/system/tiers` |
+| `teaser({title, tier: 'iNeo' \| 'NeoX' \| 'Neo ERP', text, link, href})` | the locked card of SCOPE 4.12: one line, no figures, placed where a prospect would look for the feature. `'Neo ERP'` is for what the tier itself includes; no screen uses it since SCOPE decision 19. `link: false` leaves out the link to `#/system/tiers` |
 
 **From the data layer.** What every document view needs from `HB.data.doc` and `HB.engine`, so that no page writes it again
 (used by `js/pages/buy-orders.js` and `buy-receipts.js`; `docs/PAGES.md` shows them in place):
@@ -724,7 +738,7 @@ served behind the sign-in, **Sign out**.
 
 | call | meaning |
 |---|---|
-| `HB.app.freshCopy()` | asks, then discards the user's entries and starts again from today's date (`HB.engine.freshCopy()`; without a data layer it clears the log, sets the calendar and reloads). The new copy opens on the dashboard with the filters as on a first open; the persona stays. Returns a promise of whether it went ahead. The About page's "Fresh copy" / "Reset" button calls this |
+| `HB.app.freshCopy()` | asks, then discards the user's entries and starts again from today's date (`HB.engine.freshCopy()`; without a data layer it clears the log, sets the calendar and reloads). The new copy opens on the dashboard with the filters as on a first open; the persona stays. Returns a promise of whether it went ahead. "Fresh copy dated today" in the menu at the top right calls this, and so do the calendar banner and the banner of a failed build |
 | `HB.app.banner(id, {text, tone: 'warn' \| 'info' \| 'critical', action: {label, onClick}})` | sets one banner row above the top bar; `HB.app.banner(id, null)` clears it. Ids, in display order: `engine storage notice skipped calendar message` |
 | `HB.app.showBanner(message \| '')` | sets or clears the `message` banner |
 

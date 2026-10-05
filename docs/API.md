@@ -126,8 +126,9 @@ HB.fmt.pct(0.5, 0)           // '50%'
 HB.fmt.inr(null)             // '-'
 ```
 
-Kept only because the inherited chart wrapper calls them. Pages do not call them, and pass no delta and
-no spark to a tile (SPEC section 8: no comparison against another period):
+Kept only because the inherited chart wrapper calls them. Pages do not call them, and pass no delta to a
+tile (SPEC section 8: no comparison against another period). The small charts in the tiles of the landing
+dashboard show the days of the chosen range and call neither:
 
 | Call | Returns |
 |---|---|
@@ -349,7 +350,7 @@ and `'transit_*'` is every store's transit location. Do not test these lists wit
 | sales | common + `sell-dispatch sell-corporate sell-invoices sell-returns sell-receipts stock-onhand stock-batches masters-parties` | `['factory']` | `['fac_fg']` | `[]` |
 | store_mgr | common + `stores-transfers stores-dayend stock-onhand stock-batches stock-ledger acc-cash` | `['st_vvn']` | `['st_vvn', 'transit_st_vvn']` | `['cash_st_vvn']` |
 
-common = `home guide expenses sys-tiers sys-about`. A page id is the page's file name without `.js`
+common = `home guide expenses sys-tiers`. A page id is the page's file name without `.js`
 (SPEC section 9), and it is the `id` the page registers with the router.
 
 | Call | Returns |
@@ -1564,7 +1565,9 @@ status: a list shows a cancelled document (`status: 'CANCELLED'`, `cancelled: tr
 Cancelled tab); open balances and to-do lists leave it out.
 
 **No other period, no forecast.** No selector returns a figure of a previous period, a change, a trend or a
-projection. The only series are `pnl.months()`, `sell.by('month', f)` and `sell.by('day', f)`.
+projection. The only series are `pnl.months()`, `sell.by('month', f)`, `sell.by('day', f)` and the points of a
+dashboard range (`dash.period(f).points`, 4.19): the days of the range that was asked for, or its months, and
+nothing outside it.
 
 **What comes back.** A list of documents is an array. Figures come as `{ rows, totals }` (often with `from`
 and `to`), `totals` keyed like a row. Never `null` for a list: an empty array.
@@ -2235,7 +2238,8 @@ Owner and accounts only.
 `HB.config.company.emailDomain` (or `domain`, or the domain of `email` or `website`). The company master
 names none today, so the address is at the reserved `example.com` and `placeholder` is `true`; add
 `emailDomain: '<invented domain>'` to the company record to change that. A store without a persona gets
-`store.<name>@<domain>`. Label the page "Simulated in this sample - Neo ERP sends these by email".
+`store.<name>@<domain>`. The page carries no note that nothing is sent: the handout says so (SCOPE
+decision 19).
 
 ```js
 HB.data.notify.list().forEach(function (n) { row(HB.dates.label(n.date), n.kindLabel, n.toRoleLabel, n.to, n.subject, n.docId); });
@@ -2246,12 +2250,24 @@ HB.data.notify.list().forEach(function (n) { row(HB.dates.label(n.date), n.kindL
 | Call | Returns |
 |---|---|
 | `dash.today()` | the dashboard blocks for the business date |
-| `dash.monthToDate()` | the same blocks for the first day of the month to the business date |
+| `dash.period(f)` | the same blocks for the range `f = { from, to }` |
+| `dash.monthToDate()` | `dash.period` of the month to date: the first day of the business date's month to the business date |
 | `dash.work()` | today's work |
 
-`today()` and `monthToDate()` return `{ period: 'today' | 'month', from, to, role, blocks, ...one field per
-block }`. `blocks` lists the ids of the blocks the persona gets, in order; a block that is not listed is
-`undefined`. `home.js` draws `blocks` and nothing else.
+`today()`, `period(f)` and `monthToDate()` return `{ period: 'today' | 'month' | 'range', from, to, role, blocks,
+...one field per block, days, grain, points, ...what stands beside the blocks }`. `blocks` lists the ids of the
+blocks the persona gets, in order; a block that is not listed is `undefined`. `days`, `grain`, `points` and the
+four members beside the blocks (`salesFacts`, `margin`, `returns`, `spendFacts`) are what the cockpit at the top of
+the dashboard draws; they are described under "Beside the blocks" below. `home.js` draws what it receives and
+nothing else.
+
+`period(f)` takes its range as every selector does (4.1): `from` and `to`, both days included, go-live and the
+business date where one is missing, cut to that span; `from` and `to` of the result are the range as cut. It
+reads no other field of `f`, so a page passes `ctx.filters` as it is, and it remembers one result per range. The
+roles and the scope are those of `today()`: the same blocks to the same roles, cut the same way. `period` of
+the result is `'month'` when the range is the month to date and `'range'` for any other, which is how `home.js`
+knows whether to write "month to date" or the range in words. `monthToDate()` returns the very result of
+`period` for the month to date (the same object), so the two cannot differ.
 
 | Block | Holds | Given to (besides the Owner and accounts, who get all) |
 |---|---|---|
@@ -2260,14 +2276,87 @@ block }`. `blocks` lists the ids of the blocks the persona gets, in order; a blo
 | `cash` | `cash.balances()` - now | store_mgr (its store's cash) |
 | `spend` | `{ total, byUnit: [{ unitId, unitName, amount }] }` - of the period, by location | store_mgr (its store, without salaries) |
 | `production` | `{ runs, expectedUnits, goodUnits, rejectedUnits, yield, lossValue, byItem }` - of the period; `byItem` as `make.yieldByItem().rows` | production |
-| `receivables` | `{ open, credit, balance, overdue, overdueRows: [{ customerId, customerName, overdue, open, oldestDue, invoices }] }` - now, largest overdue first | sales |
-| `payables` | `{ open, overdue, dueSoon, dueRows (ap.dueWithin()), toReimburse (paise), claims (count) }` - now | - |
+| `receivables` | `{ open, credit, balance, overdue, overdueRows: [{ customerId, customerName, overdue, open, oldestDue, invoices }], buckets }` - now, largest overdue first | sales |
+| `payables` | `{ open, overdue, dueSoon, dueRows (ap.dueWithin()), toReimburse (paise), claims (count), buckets }` - now | - |
 | `approvals` | `{ count, byType: [{ type, label, count }] }` - now | - |
 | `lowStock` | `{ count, rows }` - `stock.lowStock()`, now | stores, production |
 | `nearExpiry` | `{ count, expiredUnits, nearUnits, rows }` - `stock.expiring()`, now, cut to the scope | every role |
 
-Flows are of the period; balances are as they stand now and are the same in both calls. No block holds a
-figure of another period.
+Flows are of the period asked for; balances are as they stand now, at the business date, and are the same in
+every call whatever the range. A call holds one period: no block holds a figure of another period, and nothing
+sets two periods side by side.
+
+`buckets`, in `receivables` and in `payables`: `[{ key, label, amount, share }]`, the five ageing buckets of
+4.25 in order (`notDue`, `d1_15`, `d16_30`, `d31_60`, `d60p`, labelled as on the ageing screens). `amount` is
+the open amounts whose due date falls in the bucket, from `ar.ageing().totals` and `ap.ageing().totals` (vendors;
+claims are not aged); `share` its share of `open`, `null` when nothing is open. The amounts add up to `open`, and
+all but the first to `overdue`.
+
+**Beside the blocks.** What the cockpit at the top of the dashboard draws, in every result:
+
+| Field | Holds | Given |
+|---|---|---|
+| `days` | the number of days of the range, both ends included | always |
+| `grain` | `'day'` for a range of up to 62 days, `'month'` for a longer one | always |
+| `points` | the days of the range, or its months, oldest first: `[{ key, label, from, to, whole, ...figures }]` | always |
+| `salesFacts` | `{ openDays, average, best, slowest, channel, route }` | with the `sales` block |
+| `margin` | `{ netSales, cogs, prodLoss, writeoff, countDiff, materialCost, grossMargin, grossMarginPct, materialPct }` | with the `sales` block, to a role that has the P&L (`acc-pnl`): the Owner and accounts |
+| `returns` | `{ supplied, returned, share, limitPct, over }` | with the `sales` block, to a role with the factory in its scope: not the store manager |
+| `spendFacts` | `{ byLocation, byCategory, largest }` | with the `spend` block |
+
+A member that is not given is `undefined`. All of them are of the range asked for and lie inside it: a line of
+the range itself, never one period beside another.
+
+A point: `key` is the date, or `'YYYY-MM'` for a month; `label` is `'5 Oct'` or `'Oct 2026'`; `from` and `to` are
+the days it covers (a month holds only its days inside the range). `whole` is `true` for a finished day (one
+before the business date) and for a month that the range holds in full and that is over; `false` for the business
+date, which is still being entered, and for a month held in part or still running. A point that is not whole
+has fewer entries than its neighbours for no reason of the business: a line of what moved leaves it out, while
+the line of a balance, which does not grow with the days, keeps it. Its figures are in the point all the same,
+and in the totals.
+
+The figures of a point. A point carries only the figures of the blocks the persona gets. A figure is `null`
+where the point has no row of its kind (the factory was closed, or it is the business date and nothing is posted
+yet), so that a line has a gap there and not a fall to nothing:
+
+| Figure | With | Holds |
+|---|---|---|
+| `netSales` | `sales` | the sales and returns rows of the point, in the persona's units. They add up to `sales.net` |
+| `collected` | `collections` | the cash rows of kind `collected` and `receipt`. They add up to `collections.total` |
+| `materialCost` | `margin` | the rows of the four cost lines: `cogs`, `prodLoss`, `writeoff`, `countDiff`. They add up to `margin.materialCost` |
+| `marginPct` | `margin` | `(netSales - materialCost) / netSales`, a fraction; `null` with no sales row, or with net sales of nothing |
+| `goodUnits` | `production` | the good units of the production entries dated in the point; a cancellation takes them back on its own date. They add up to `production.goodUnits` |
+| `supplied` | `returns` | the sales rows of the retail and corporate channels: what went out on invoice. They add up to `returns.supplied` |
+| `returned` | `returns` | the returns rows, as a positive figure. They add up to `returns.returned` |
+| `returnShare` | `returns` | `returned / supplied`, a fraction (`returned` counting as nothing where it is `null`); `null` where nothing was supplied |
+| `cashBalance` | `cash` | the balance of the accounts in scope at the end of the point's last day: every cash row dated up to it. Never `null`. In a range that ends on the business date the last one is `cash.total` |
+
+`salesFacts`. An **open day** is a day whose sales rows, before returns, add up to more than nothing: a day the
+factory was closed, the business date before anything is posted, and a day that only took a sale back are not
+open. `openDays` counts them. `average` is `sales.net / openDays`, to the paisa, `null` with no open day. `best`
+and `slowest` are `{ date, net }`: the open day with the highest and with the lowest net sales, the earlier of
+two that tie, `null` with no open day; they are days whatever the grain. `channel` is `{ channel, label, net,
+share }`, the channel of `sales.byChannel` with the highest net sales above nothing; `route` is `{ routeId,
+label, net, share }`, the route with the highest net sales above nothing among the rows of `sell.by('route', f)`
+that have a route (4.6); of two that tie, the first in master order. `share` is of `sales.net`. Either is `null`
+when there is none: a store manager has no route.
+
+`margin` is the P&L of 4.11 summed over the range: `materialCost = cogs + prodLoss + writeoff + countDiff`,
+`grossMargin = netSales - materialCost`, `grossMarginPct` and `materialPct` their shares of `netSales` (`null`
+with net sales of nothing). `netSales` is `sales.net`. For a whole month the figures are those of `pnl.month()`.
+
+`returns`: `supplied` and `returned` as in the points, `share = returned / supplied` (`null` when nothing was
+supplied). `limitPct` is `HB.masters.limits.returnsPct`, a percentage as the engine stores it. `over` is `true`
+when something was supplied and `returned * 100 > limitPct * supplied`: exactly at the limit is within it, as
+for a stale return (SPEC 5.2).
+
+`spendFacts`, of the same expense rows as `spend` and cut to the same view (4.14): `byLocation` is `[{ unitId,
+unitName, amount, share }]`, every unit in scope in master order, spent at or not (a deactivated one only while it
+has spend in the range); `byCategory` is `[{ categoryId, categoryName, amount, share }]`, the categories whose
+amount is not nothing, the largest first (two of the same amount in master order); `largest` is the first of
+them when its amount is above nothing, else `null`. `share` is of `spend.total`, `null` when that is nothing.
+
+`today()` holds the same members for the business date alone: one point, which is never whole.
 
 `work()` returns `{ date, count, groups }`; `groups`: `[{ kind, label, route, count, items }]`, only the groups
 with something in them, in this order:
@@ -2288,8 +2377,10 @@ whether they may act; any other role only the items it may act on. Nothing else 
 no forecast.
 
 ```js
-var d = HB.data.dash.today();
-d.blocks.forEach(function (id) { page.appendChild(BLOCKS[id](d[id])); });
+var d = HB.data.dash.today(), r = HB.data.dash.period(ctx.filters);   // the business date, and the range of the filter bar
+d.blocks.forEach(function (id) { page.appendChild(BLOCKS[id](d[id], r[id])); });   // r.period === 'month' while the range is the month to date
+if (r.sales) HB.charts.sparkline(el, r.points.map(function (p) { return p.whole ? p.netSales : null; }),   // the line of the hero
+  { fluid: true, format: 'inr', labels: r.points.map(function (p) { return p.label; }) });
 HB.data.dash.work().groups.forEach(function (g) { section(g.label, g.items, g.route); });
 ```
 
@@ -2485,6 +2576,12 @@ exportButton.onclick = function () { HB.ui.downloadCsv(res.id + '.csv', R.csvCol
   ageing, cash, stock on hand under 1 ms each; a month of sales by day, by item or the register 2 to 5 ms;
   a statement or a ledger of a month 4 to 7 ms; a document view 10 to 15 ms. Since go-live: the sales
   summary 16 ms, every invoice (32,800 rows) 60 ms, the stock statement 33 ms. Any second call: 0.02 ms.
+- The members beside the dashboard blocks (4.19) cost one more walk over the days of the range, a walk over
+  the cash rows dated after it (for the balance at each point), and the sales of the range by route. Measured
+  on the full company (`js/data/seed.js`), first call after a change, the three dashboard calls together: 3 ms on
+  a copy dated 5 Oct 2026 (37,800 documents), 8 ms on one dated 31 Dec 2027 (98,700 documents). `dash.period` of
+  the life of the copy, the dearest range: 31 ms and 75 ms. The route of a stale return is found by halving the
+  outlet's invoices, whose lists are made in one walk over the invoices per state of the book.
 - A page shows a range: give `from` and `to`. A list of every invoice since go-live is 30,000 rows; page it
   (`forms.docList` does).
 - `HB.data.reset()` forgets every result. It is never needed after `HB.engine.act` or `boot`; a test that
@@ -2535,6 +2632,30 @@ vendor bill cancelled a day later than they are dated).
   zeros by product, outlet, route or unit, the outlets' statements invoiced and paid to nothing, and the
   whole reconciliation of s.1 once more on that book; then `sell.sheet(id).repost` on later business dates,
   by role (further back than sales may go; a locked month).
+- **s.8**: the dashboard of a range, on a new copy: the 35 operations, four entries back-dated into February (a
+  sale, a receipt, a production run, an expense bill) and, on the next business date, three cancellations (an
+  invoice, an expense bill, a production run of that day), a production run and a receipt. `dash.period` for
+  seven ranges - a whole past month, a range across two months, the day of the cancellations, one day, the
+  month to date, the life of the copy, a month in which nothing moved - against a straight sum: sales by
+  channel, spend by location and production by product from the documents, collections from the raw cash rows
+  and once more from the documents. February and 10 March typed in. A whole month against its P&L: net sales
+  by channel, expenses, production loss. The month to date is `monthToDate()`, the same object; every range
+  has its shape; a balance is the same whatever the range; the range is cut to go-live and the business date;
+  a result is remembered until the book moves. By role: the blocks of `today()`, one store and no salaries for
+  the store manager, no payables and no spend for sales.
+- **s.9**: what a dashboard result holds beside its blocks, on the copy of s.8 rebuilt from its log with a stale
+  return back-dated into February. For the same seven ranges - a whole past month, the life of the copy at 70
+  days and so by month, a day, the month to date - the points, the day facts, the margin, the returns and the
+  spend against a straight pass: the figures of each point from the raw rows of the P&L and cash ledgers and from
+  the production entries, with `null` where a point has nothing; the balance of each point as every cash row up
+  to its last day, and as the closing balances of the cash books; the leading channel and route, the cost lines,
+  what was supplied and returned and the spend by location and category from the documents. The points add up
+  to the totals of the blocks, and the months of a long range are its days added up. February, the nineteen
+  days to 10 Mar and March to date typed in; a whole month against its P&L; 62 days by day and 63 by month; which
+  points are whole; the returns limit read from the masters and met exactly. The ageing buckets against the open
+  amounts by due date. By role: the figures of a point and the members beside the blocks are those of the blocks
+  the role gets, for a range by day, a range by month and today; the store manager her store's sales, cash and
+  spend without salaries; sales no cost, margin, spend or balance; stores the days alone.
 
 ### 4.25 Choices where SPEC was silent
 
@@ -2558,8 +2679,20 @@ vendor bill cancelled a day later than they are dated).
 - **Collections** are not given to the store manager: a store's takings are its sales and its cash.
 - **Spend for the store manager** is the expense rows of its unit without salaries; for the three roles with
   only their own claims it is those claims once approved.
-- **Dashboard**: flows are of the period, balances as they stand now in both periods; a block goes to the
-  roles that have a page for the same thing, which gives exactly the list of SPEC section 7.
+- **Dashboard**: flows are of the period asked for (the business date, or a range), balances as they stand at
+  the business date whatever the period; a block goes to the roles that have a page for the same thing, which
+  gives exactly the list of SPEC section 7. `dash.period()` with no range is the life of the copy, as for every
+  range selector; the month to date is `monthToDate()`. A range of the dashboard has no unit filter: the screen
+  shows the date control alone.
+- **The points of a dashboard range** (4.19) follow the rule the dashboard's bar chart already had: a day each
+  up to 62 days, a month each beyond. A figure of a point is `null`, not zero, where nothing was entered, so that
+  a closed day is a gap in a line. `whole` is the data layer's word on which points a line may join: the business
+  date is still being entered and a month held in part has fewer days than its neighbours, and either would end
+  a line in a fall the business never took. An open day is one with sales above nothing, so that neither a
+  closed day nor the day of a cancellation is the "slowest day". What was "supplied", for the share of stale
+  returns, is what went out on invoice to outlets and corporates: a store sells at its counter and returns
+  nothing. Margin and returns are not blocks of their own: they go with the sales, to the roles named in 4.19,
+  and `blocks` lists what it always did.
 - **Notifications**: one per waiting document, per customer with overdue invoices, per bill falling due or
   overdue, per low item and per expiring batch and location; recipients by role; dates as in 4.18; the
   address at `company.emailDomain`, else at `example.com` with `placeholder: true`.

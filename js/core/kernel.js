@@ -511,7 +511,7 @@
    * and 'transit_*' is every store's transit location, present and future. Test with HB.session.matches().
    */
   var ALL = ['*'];
-  var COMMON_PAGES = ['home', 'guide', 'expenses', 'sys-tiers', 'sys-about'];
+  var COMMON_PAGES = ['home', 'guide', 'expenses', 'sys-tiers'];
 
   var ACCESS = {
     owner: { pages: ALL, unitIds: ALL, locIds: ALL, accountIds: ALL },
@@ -749,7 +749,7 @@
     can: function (action, ctx) {
       ctx = ctx || {};
       var u = ctx.user ? (typeof ctx.user === 'string' ? userById(ctx.user) : ctx.user) : HB.session.current();
-      if (!u || !ACCESS[u.role]) return refuse('role', 'This user is not one of the people of the sample');
+      if (!u || !ACCESS[u.role]) return refuse('role', 'This user is not one of the people of the demo');
       var key = String(action || '').toLowerCase();
       var dot = key.indexOf('.');
       var verb = dot === -1 ? key : key.slice(0, dot), rest = dot === -1 ? '' : key.slice(dot + 1);
@@ -764,7 +764,7 @@
 
       if (verb === 'cancel') {
         var c = CANCELS[rest];
-        if (!c) return refuse('unknown_action', 'This cannot be done in the sample');
+        if (!c) return refuse('unknown_action', 'This cannot be done in the demo');
         var via = rest === 'exp' && EXP_KIND_ACTION[sub.kind] ? [EXP_KIND_ACTION[sub.kind]] : c.via;
         var first = null;
         for (var i = 0; i < via.length; i++) {
@@ -775,7 +775,7 @@
         return first;
       }
 
-      if (!ACTIONS[key]) return refuse('unknown_action', 'This cannot be done in the sample');
+      if (!ACTIONS[key]) return refuse('unknown_action', 'This cannot be done in the demo');
       return testAction(u, key, ctx, ACTIONS[key].what);
     },
     /** Every role that may do a create-type action, the Owner first. [] for an unknown action. */

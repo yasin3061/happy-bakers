@@ -3561,7 +3561,7 @@
         var had = logOf().length;
         HB.store.remove('log');
         HB.calendar.set(HB.calendar.realToday());
-        E.notice = 'The sample has been updated since this copy was saved' +
+        E.notice = 'The demo has been updated since this copy was saved' +
           (had ? ', so the ' + (had === 1 ? 'entry' : had + ' entries') + ' made in it could not be kept' : '') +
           '. A fresh copy dated ' + dayText(HB.calendar.today) + ' has been started.';
       }

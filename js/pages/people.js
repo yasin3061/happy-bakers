@@ -150,9 +150,7 @@
         ],
         newLabel: 'Add employee', newReason: may.ok ? '' : may.reason,
         onNew: function () { open(st, ctx, null); }
-      }),
-      forms.teaser({ title: 'Attendance and leave; tasks', tier: 'Neo ERP',
-        text: 'Attendance, leave and tasks are part of Neo ERP. They are not shown in this sample.' }));
+      }));
   }
 
   /* ------------------------------------------------------------------ form */

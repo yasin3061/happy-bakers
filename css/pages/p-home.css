@@ -1,9 +1,109 @@
 /* home: page styles. Every selector under .pg-home; colours as var(--token) only. */
 
+/* ------------------------------------------------------------------ the cockpit */
+/*
+ * Twelve columns. On a wide screen the hero takes four of them and the tiles of the range the other eight, three to a
+ * row; what stands at the business date runs under both, or joins the tiles beside the hero when there are few. Below
+ * 1340px (a 1366px laptop still has the hero at the side) the hero lies across the top and everything else follows
+ * under it, so no tile is squeezed.
+ */
+.pg-home .pg-home__cockpit { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--sp-3); }
+.pg-home .pg-home__cockpit > * { grid-column: span 12; min-width: 0; }
+.pg-home .pg-home__main { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
+.pg-home .pg-home__tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: var(--sp-3); }
+.pg-home .pg-home__tiles--1 { grid-template-columns: minmax(0, 1fr); }
+.pg-home .pg-home__tiles--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pg-home .pg-home__tiles--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pg-home .pg-home__tiles--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.pg-home .pg-home__main > .pg-home__tiles { flex: 1 1 auto; }
+
+@media (min-width: 1340px) {
+  .pg-home .pg-home__cockpit--lead > .pg-home__hero, .pg-home .pg-home__cockpit--split > .pg-home__hero { grid-column: span 4; }
+  .pg-home .pg-home__cockpit--lead > .pg-home__main, .pg-home .pg-home__cockpit--split > .pg-home__main { grid-column: span 8; }
+}
+
+/* The line that says what the tiles under it are as at: small, between the two groups. */
+.pg-home .pg-home__note { display: flex; align-items: center; gap: 6px; margin-top: var(--sp-1); color: var(--ink-2); font-size: var(--fs-sm); }
+.pg-home .pg-home__note svg { flex: none; color: var(--ink-3); }
+
+/* ---- the hero: one large figure, its small chart, then facts with a hairline between them. Narrow, the three stand
+   one under the other; given room (the hero lying across the top) the facts stand beside the figure. */
+.pg-home .pg-home__hero { container-type: inline-size; }
+.pg-home .pg-home__hero-body { display: flex; flex-direction: column; gap: var(--sp-5); min-width: 0; padding-top: var(--sp-1); }
+.pg-home .pg-home__hero-main { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+/* the label of the figure, and at its right the way to the screen that holds the detail */
+.pg-home .pg-home__hero-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+.pg-home .pg-home__hero-go { flex: none; font-size: var(--fs-sm); white-space: nowrap; }
+.pg-home .pg-home__facts { display: flex; flex-direction: column; min-width: 0; }
+.pg-home .pg-home__fact {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3);
+  padding: 7px 0; border-top: 1px solid var(--grid);
+  font-size: var(--fs-md); line-height: 1.4;
+}
+.pg-home .pg-home__fact:first-child { border-top: 0; padding-top: 0; }
+.pg-home .pg-home__fact:last-child { padding-bottom: 0; }
+.pg-home .pg-home__fact-label { min-width: 0; color: var(--ink-2); }
+.pg-home .pg-home__fact-what { color: var(--ink); font-weight: 550; }
+.pg-home .pg-home__fact-value { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+
+@container (min-width: 640px) {
+  .pg-home .pg-home__hero-body { flex-direction: row; align-items: stretch; gap: var(--sp-8); }
+  .pg-home .pg-home__hero-main { flex: 0 0 40%; justify-content: space-between; }
+  .pg-home .pg-home__facts { flex: 1 1 0; justify-content: center; }
+}
+
+/* ---- a tile of the cockpit: the kit's tile with a small chart at its foot, so the charts of a row stand in line */
+.pg-home .pg-home__tile > .pg-home__chart, .pg-home .pg-home__bars, .pg-home .pg-home__age { margin-top: auto; padding-top: var(--sp-2); }
+.pg-home .pg-home__chart { display: block; min-width: 0; }
+
+/* spend by location: name, bar, amount. One colour: the bars are one series, told apart by their names. */
+.pg-home .pg-home__bars {
+  display: grid; grid-template-columns: minmax(0, max-content) minmax(28px, 1fr) max-content; column-gap: var(--sp-2); row-gap: 5px; align-items: center;
+  color: var(--ink-2); font-size: var(--fs-xs); line-height: 1.3;
+}
+.pg-home .pg-home__bar { display: contents; }
+.pg-home .pg-home__bar-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pg-home .pg-home__bar-track { height: 6px; }
+.pg-home .pg-home__bar-fill { display: block; height: 100%; min-width: 2px; border-radius: 0 3px 3px 0; background: var(--series-1); }
+.pg-home .pg-home__bar-value { color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+/* what is open by age: one bar, a 2px gap between its parts, one hue from light (not due) to dark (the oldest).
+   The five steps were checked as an ordinal ramp on the card surface: each a clear step darker, the lightest above 2:1. */
+.pg-home .pg-home__age { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.pg-home .pg-home__age-bar { display: flex; gap: 2px; height: 8px; }
+.pg-home .pg-home__age-part { flex: 0 1 0; min-width: 3px; }
+.pg-home .pg-home__age-part:last-child { border-radius: 0 4px 4px 0; }
+.pg-home .pg-home__age-part--notDue { background: var(--seq-350); }
+.pg-home .pg-home__age-part--d1_15 { background: var(--seq-450); }
+.pg-home .pg-home__age-part--d16_30 { background: var(--seq-550); }
+.pg-home .pg-home__age-part--d31_60 { background: var(--seq-650); }
+.pg-home .pg-home__age-part--d60p { background: var(--seq-700); }
+.pg-home .pg-home__age-ends { display: flex; justify-content: space-between; gap: var(--sp-2); color: var(--ink-2); font-size: var(--fs-xs); line-height: 1.3; }
+.pg-home .pg-home__age-ends span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.pg-home .pg-home__age-ends i { flex: none; width: 8px; height: 8px; border-radius: 2px; }
+
+/* five tiles do not fit one row of a small screen: receivables and payables share the first, the other three the second */
+@media (max-width: 1180px) {
+  .pg-home .pg-home__tiles--5 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .pg-home .pg-home__tiles--5 > * { grid-column: span 2; }
+  .pg-home .pg-home__tiles--5 > :nth-child(-n+2) { grid-column: span 3; }
+  .pg-home .pg-home__tiles--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ------------------------------------------------------------------ under the cockpit */
+
 /* The cards stand two abreast on a wide screen and one under the other from 1400px down, so no table is squeezed. */
 @media (max-width: 1400px) {
   .pg-home .pg-home__grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* A heading that names a long range ("15 Dec 2026 - 14 Jan 2027") stays whole: when its small line does not fit beside
+   it, the small line goes under it. A heading that fits, as for the month to date, is on one line as before. */
+.pg-home .mk-section-title { flex-wrap: wrap; row-gap: 0; }
+
+/* A range longer than the month to date brings larger figures: there a column head may take two lines, so that the six
+   columns of sales by channel still fit a card that stands beside another. The month to date is laid out as it always was. */
+.pg-home .pg-home__grid--range .mk-table th { white-space: normal; }
 
 /* Today's work: the button of a row keeps to one line beside its text. */
 .pg-home .pg-home__work td:last-child { white-space: nowrap; width: 1%; }

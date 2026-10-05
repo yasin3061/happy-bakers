@@ -83,7 +83,9 @@ Keep from the inherited kernel: `HB.bus`, `HB.dates`, `HB.hash`, `HB.rng`. Chang
   rupees with Indian grouping, `inr2(p)` rupees with two decimals (documents and registers),
   `num(n, d)`, `pct(x, d)`, `qty(q, unit)` ("12.5 kg", "240 pcs"), `rate(p)` (rupees with up to four
   decimals, trailing zeros trimmed). `fmt.delta` and `fmt.points` stay in the kernel only because the
-  inherited chart wrapper calls them; pages do not call them and pass no delta and no spark to a tile.
+  inherited chart wrapper calls them; pages do not call them and pass no delta to a tile. A tile carries
+  a small chart on the landing dashboard only, and there it shows the days or months of the chosen range
+  (section 8): never a change against another period.
 - `HB.q3(x)`, `HB.money.fromRupees(r)` -> paise, `HB.money.toRupees(p)`, `HB.money.amount(qty, rate)`
   (section 2, item 8).
 - `HB.calendar` = `{ goLive: '2026-01-01', today, dataEnd, realToday(), set(iso), lockBefore }`.
@@ -559,17 +561,26 @@ expenses, and nothing else. Owner and accounts: every page, every unit, location
 | sales | sell-dispatch, sell-corporate, sell-invoices, sell-returns, sell-receipts, stock-onhand, stock-batches, masters-parties (customers only) | unit factory; fac_fg; no accounts |
 | store_mgr | stores-transfers, stores-dayend, stock-onhand, stock-batches, stock-ledger, acc-cash | unit st_vvn; locations st_vvn, transit_st_vvn; account cash_st_vvn |
 
-Every role also gets home, guide, expenses, sys-tiers and sys-about. On expenses, stores, production
+Every role also gets home, guide, expenses and sys-tiers. On expenses, stores, production
 and sales see their own claims only; store_mgr sees the claims and expense bills of its store (never
 the salary bill). All other pages are for owner and accounts only; accounts sees approvals with approve
 and reject disabled and the reason.
 
 `dash.work()` lists an item for owner and accounts, and for another role only when `HB.session.can`
-allows the action the item needs. `dash.today()` and `dash.monthToDate()` return sales, collections,
-cash and bank, spend, receivables, payables and approvals to owner and accounts; to store_mgr its own
-store's sales, cash and spend; to sales the sales, collections and overdue receivables; production
-figures to production; low stock to stores and production; near-expiry to every role, cut to
-`scope()`. `home.js` draws the blocks it receives and nothing else.
+allows the action the item needs. `dash.today()`, `dash.period(f)` (a range: the dashboard passes the
+date range of the filter bar) and `dash.monthToDate()` (`period` of the month to date) return sales,
+collections, cash and bank, spend, receivables, payables and approvals to owner and accounts; to
+store_mgr its own store's sales, cash and spend; to sales the sales, collections and overdue
+receivables; production figures to production; low stock to stores and production; near-expiry to
+every role, cut to `scope()`. Sales, collections, spend and production are of the period asked for;
+the rest is as at the business date in every call. Beside the blocks a result holds what the cockpit at
+the top of the dashboard draws, for the same period and cut the same way: the days of the range (its
+months when it is longer than 62 days), each with the figures of the blocks the role gets and of no
+other; with the sales, the day facts of the range (the average of its open days, the best and the
+slowest of them, the leading channel and route), the stale returns as a share of what was supplied (not
+to store_mgr, whose store returns nothing) and, to owner and accounts only, the gross margin; with the
+spend, its split by location and by category; and with receivables and payables, what is open by age.
+`home.js` draws what it receives and nothing else.
 
 ## 8. Selectors (`HB.data`)
 
@@ -589,7 +600,7 @@ cash      balances() book(accountId, f)
 pnl       month(monthKey) months() entries(f)   margin  byItem(f) byChannel(f)        gst  summary(f)
 exp       list(f) byCategory(f) byUnit(f)   people  list() headcount()
 approvals pending()      audit  list(f)      notify  list()
-dash      today() monthToDate() work()      guide  journeys()  (section 8.1)
+dash      today() period(f) monthToDate() work()      guide  journeys()  (section 8.1)
 doc       get(id)  timeline(id)  related(id)
 ```
 
@@ -606,8 +617,14 @@ doc       get(id)  timeline(id)  related(id)
   beside what it cancels and both net to nothing when they fall in the same range.
 - No comparison. No selector returns a previous-period figure, and no tile, table or chart shows a
   change against another period (SCOPE 4.10 and 4.12: comparison is an iNeo teaser). The only period
-  series are the month-wise totals since go-live (`pnl.months()`, `sell.by('month', f)`) and this month
-  by day (`sell.by('day', f)`), drawn as plain bars.
+  series are the month-wise totals (`pnl.months()`, `sell.by('month', f)`: since go-live, or the months
+  of a range) and a range by day (`sell.by('day', f)`: this month by default), drawn as plain bars; and
+  the points of a dashboard range (`dash.period(f).points`): the days of the chosen range, or its months
+  when it is longer than 62 days, which the tiles of the landing dashboard draw as small charts. A small
+  chart shows the chosen range and nothing else: the line of a tile never holds a day outside the range,
+  and no tile sets its figure against another period. The line of what moved (sales, collections,
+  production, margin, returns) joins the finished days, or the months held in full, only: the business
+  date and a part month are in the totals, not in the line. The line of a balance keeps every point.
 - No forecast. `dash.work()` is built only from sheets to post (section 5.2), `stores.pending`,
   `buy.dueForReceipt`, `make.todo` and `approvals.pending`. `stores.pending(date)` returns, per store
   in scope, whether a transfer is still to send (its `transferSheet` proposes a quantity), the
@@ -666,7 +683,7 @@ title, subtitle, filters, render })`; the router takes the roles of a page from 
 
 | Group | File | Route | What it holds |
 |---|---|---|---|
-| Home | `home.js` | `#/home` | Dashboard and Today's work (SCOPE 4.10); NeoX teaser card |
+| Home | `home.js` | `#/home` | Dashboard. On top a cockpit for the date range (the month to date by default): one hero figure with its facts, the other figures of the range as tiles with a small chart of its days, and what stands at the business date in a row of tiles; then Today's work (SCOPE 4.10), the tables behind the figures and two bar charts; NeoX teaser card |
 | Home | `approvals.js` | `#/approvals` | Everything waiting for approval, by type, with the evidence to decide; approve / reject |
 | Home | `guide.js` | `#/guide` | "Try this" journeys with self-ticking steps and links (section 8.1) |
 | Sell | `sell-dispatch.js` | `#/sell/dispatch` | Route sheets for a date: grid of outlets x items, stock available, post; posted sheets, each with "Cancel the sheet" |
@@ -687,7 +704,7 @@ title, subtitle, filters, render })`; the router takes the roles of a page from 
 | Stock | `stock-ledger.js` | `#/stock/ledger` | The movement ledger |
 | Stock | `stock-counts.js` | `#/stock/counts` | Stock count and adjustment |
 | Expenses | `expenses.js` | `#/expenses` | Claims, expense bills, salary bill; spend by category and location; iNeo teaser |
-| People | `people.js` | `#/people` | Employee directory, headcount, salary cost; "in Neo ERP" teaser |
+| People | `people.js` | `#/people` | Employee directory, headcount, salary cost |
 | Accounts | `acc-receivables.js` | `#/accounts/receivables` | Outstanding, ageing, overdue |
 | Accounts | `acc-payables.js` | `#/accounts/payables` | Outstanding, ageing, due this week, claims to reimburse |
 | Accounts | `acc-cash.js` | `#/accounts/cash` | Cash and bank book, deposit; iNeo teaser |
@@ -701,7 +718,12 @@ title, subtitle, filters, render })`; the router takes the roles of a page from 
 | System | `sys-audit.js` | `#/system/audit` | Audit log |
 | System | `sys-notifications.js` | `#/system/notifications` | Notification log |
 | System | `sys-tiers.js` | `#/system/tiers` | What the higher tiers add |
-| System | `sys-about.js` | `#/system/about` | About this sample: business date, what is stored, fresh copy, reset |
+
+There is no About page (SCOPE decision 19). What the app once said about itself - the company is
+invented, how the history is built, what the browser stores, what is not switched on - is in the handout
+(`docs/handout/handout.html`, printed to PDF by `node tools/handout.js`). The fresh copy is in the menu
+at the top right; the banners of section 10 say what a copy needs said (storage, skipped entries, the
+calendar). No screen carries a note about the demo itself, and no on-screen text says "sample".
 
 Rules for every page:
 
@@ -717,21 +739,32 @@ Rules for every page:
 - **After posting**, a toast names the document and says in one line what moved ("Stock up 500 kg,
   bread cost Rs 21.40 -> Rs 22.15").
 - A document id anywhere is a link to that document (`#/doc/<id>` opens the right page and view).
-- Charts are few and plain (month-wise bars, this month by day). Tables carry the page. No tile shows
-  a change against another period.
+- Charts are few and plain (month-wise bars; a range by day, by month when it is longer than 62 days).
+  Tables carry the page. No tile shows a change against another period. The landing dashboard is the one
+  screen whose tiles hold a small chart: a thin line of the days of the chosen range (its months when it
+  is longer than 62 days) with the last point marked, small bars by location, one bar of what is open by
+  age; no axis, one colour, and an accessible label that says in words what the chart shows.
 - Wording: plain, active, no jargon, no em-dash asides, no exclamation marks. "Purchase order",
   "Goods receipt", "Vendor bill", "Stale return", "Day-end".
 
 ## 10. Shell changes
 
-- Rename the global to `HB`, storage prefix, brand block ("Happy Bakers", "Neo ERP sample"), page
-  title. Colours are The Biz CFO's (bizcfoapp docs/DESIGN.md: brand navy sidebar, electric blue for the primary action, the blue-tinted canvas, its status and chart colours) under this sample's token names in css/tokens.css; the brand block shows the Neo ERP mark and the sidebar foot the logo of The Biz CFO (vendor/brand).
+- Rename the global to `HB`, storage prefix, brand block ("Happy Bakers", "Neo ERP"), page
+  title ("Happy Bakers - Neo ERP"). The foot of the sidebar carries the one line the app says about itself:
+  "This is a Demo based on test data" (SCOPE decision 19); the sign-in page carries the same line. Colours are The Biz CFO's (bizcfoapp docs/DESIGN.md: brand navy sidebar, electric blue for the primary action, the blue-tinted canvas, its status and chart colours) under this sample's token names in css/tokens.css; the brand block shows the Neo ERP mark and the sidebar foot the logo of The Biz CFO (vendor/brand).
 - Top bar: the business date ("Business date 2 Oct 2026"), the persona switcher, a menu with Fresh copy
   / Reset and Sign out. No simulated loading (`latency.js` goes).
 - Banners: storage not available; log entries skipped on replay; calendar has moved on since this copy
   was created ("Start a fresh copy dated today"), by the test in section 4.
-- `HB.filters`: date range (presets Today, Yesterday, Last 7 days, This month, Last month, Since go-live,
-  Custom - relative to the business date) and unit (factory and the stores, limited by scope).
+- `HB.filters`: date range and unit (factory and the stores, limited by scope). The date control keeps the
+  From and To dates in sight in the bar (typed or picked), lists This month, Last month, Last 7 days, Last 30
+  days, Today, Yesterday, Since go-live and every month since go-live by name, and has an arrow either side
+  to step a month (or a range of days) earlier or later - all relative to the business date. Every screen
+  whose figures belong to a period declares `filters: ['date']`; screens that show a position as at the
+  business date, masters or settings do not. The dashboard holds both: it declares the date range for its
+  period figures; its balances stay as at the business date and say so: the row of tiles that holds them
+  is headed by that date, and for any range but the month to date the cash tile and the cards below name
+  it too.
 - `HB.forms` (new, documented in `docs/shell/UI-API.md`): `docForm`, `lineGrid` (add / remove rows, item
   picker, quantity / rate / amount cells, keyboard friendly), `qtyInput`, `rateInput`, `amountInput`
   (rupees with paise in, paise out), `docView`, `statusTabs`, `teaser({ title, tier, text })`,

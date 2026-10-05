@@ -1245,7 +1245,7 @@
   var TIERS = {
     'ineo': { label: 'iNeo', icon: 'lock', note: 'In the iNeo tier' },
     'neox': { label: 'NeoX', icon: 'lock', note: 'In the NeoX tier' },
-    'neo erp': { label: 'Neo ERP', icon: 'info', note: 'Part of Neo ERP, not shown in this sample' }
+    'neo erp': { label: 'Neo ERP', icon: 'info', note: 'Part of Neo ERP' }
   };
 
   /**

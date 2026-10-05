@@ -416,6 +416,27 @@
 .mk-spark__area { fill: var(--series-muted); stroke: none; opacity: 0.2; }
 .mk-spark__dot { stroke: var(--surface); stroke-width: 1.5; }
 
+/* A fluid sparkline (opts.fluid) fills the width of its container: the svg is stretched sideways, so every stroke is
+   kept at its own weight and the end dot is a zero-length stroke with a round cap, 8px across in a 2px surface ring.
+   The box is inset by the dot's overhang on the right, so the dot never leaves the tile. */
+.mk-spark--fluid { display: block; width: calc(100% - 7px); margin: 0 6px 0 1px; }
+.mk-spark--fluid path { vector-effect: non-scaling-stroke; }
+.mk-spark__ring, .mk-spark__end, .mk-spark__probe { fill: none; stroke-linecap: round; }
+.mk-spark__ring { stroke: var(--surface); stroke-width: 12; }
+.mk-spark__end { stroke-width: 8; }
+/* the hover layer: a hairline on the point nearest the pointer, a small dot on the line, the whole box as the target */
+.mk-spark__cross { fill: none; stroke: var(--axis); stroke-width: 1; }
+.mk-spark__probe { stroke: var(--ink); stroke-width: 6; }
+.mk-spark__hit { fill: none; pointer-events: all; }
+.mk-sparktip {
+  position: fixed; z-index: 70; pointer-events: none;
+  padding: 6px 10px; border-radius: 8px;
+  background: var(--surface); box-shadow: var(--shadow-pop);
+  white-space: nowrap;
+}
+.mk-sparktip__val { font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
+.mk-sparktip__name { font-size: var(--fs-xs); color: var(--ink-2); }
+
 /* ------------------------------------------------------------------ #/system/styleguide-charts */
 
 .mk-cg {

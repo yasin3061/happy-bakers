@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>The Happy Bakers demo - a short guide</title>
+  <!--
+    The handout for the people the demo is shared with: three A4 pages. Everything the app once said about itself
+    (the About page and the notes on its screens) lives here instead (docs/SCOPE.md, decision 19).
+    To make the PDF:  node tools/handout.js   ->  docs/handout/Happy-Bakers-demo-guide.pdf
+    The picture on page 1 is dashboard.png; dashboard-shot.js says how to take it again.
+  -->
+  <style>
+    @page { size: A4; margin: 0; }
+    :root {
+      --navy: #081b45; --blue: #0d94fb; --blue-deep: #046bd2; --blue-soft: #e6f3ff;
+      --ink: #1f2636; --ink-2: #334155; --muted: #64748b; --ring: #e3e8ee; --soft: #f0f5fa; --tint: #f5f7fe;
+      --good: #0b7a44; --good-soft: #e6f6ee; --on-navy-2: #b8c2d9;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { font: 9.6pt/1.5 "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif; color: var(--ink); background: #fff; }
+    b, strong { font-weight: 600; }
+
+    .sheet { position: relative; width: 210mm; height: 297mm; overflow: hidden; break-after: page; display: flex; flex-direction: column; }
+    .sheet:last-of-type { break-after: auto; }
+    .body { flex: 1; padding: 8mm 16mm 0; }
+
+    /* page 1: the cover band */
+    .cover { background: var(--navy); color: #fff; padding: 10mm 16mm 9mm; }
+    .cover__top { display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 3mm; font-weight: 700; font-size: 13pt; }
+    .brand img { width: 9mm; height: auto; }
+    .by { display: flex; align-items: center; gap: 2.5mm; color: var(--on-navy-2); font-size: 8.5pt; }
+    .by img { height: 5.2mm; width: auto; }
+    .cover h1 { font-size: 27pt; line-height: 1.15; font-weight: 700; margin-top: 8mm; letter-spacing: -.01em; }
+    .cover p { margin-top: 2.5mm; font-size: 11.5pt; color: var(--on-navy-2); }
+
+    /* pages 2 and 3: a running head */
+    .run { display: flex; align-items: center; justify-content: space-between; margin: 10mm 16mm 0; padding-bottom: 3mm; border-bottom: .3mm solid var(--ring); color: var(--muted); font-size: 8pt; }
+    .run span:first-child { display: flex; align-items: center; gap: 2mm; color: var(--navy); font-weight: 600; }
+    .run img { width: 5mm; height: auto; }
+
+    .foot { padding: 0 16mm 8mm; }
+    .foot div { display: flex; justify-content: space-between; padding-top: 3mm; border-top: .3mm solid var(--ring); color: var(--muted); font-size: 7.6pt; }
+
+    h2 { display: flex; align-items: center; gap: 2.5mm; margin-bottom: 3mm; color: var(--navy); font-size: 13pt; font-weight: 700; }
+    h2::before { content: ""; width: 1.2mm; height: 5mm; border-radius: .6mm; background: var(--blue); }
+    section + section { margin-top: 7mm; }
+    .lead { color: var(--ink-2); font-size: 10.6pt; line-height: 1.55; }
+    .lead + .lead { margin-top: 2.4mm; }
+    .intro { margin-bottom: 3mm; color: var(--ink-2); }
+
+    .shot { height: 95mm; margin-top: 5mm; border: .3mm solid var(--ring); border-radius: 2.2mm; overflow: hidden; box-shadow: 0 1.2mm 4mm rgba(8, 27, 69, .1); }
+    .shot img { display: block; width: 100%; }
+    .cap { margin-top: 2mm; color: var(--muted); font-size: 8.2pt; }
+
+    .steps { display: grid; gap: 2.2mm; list-style: none; counter-reset: s; }
+    .steps li { display: grid; grid-template-columns: 6.2mm 1fr; gap: 3mm; align-items: start; counter-increment: s; }
+    .steps li::before, .try i { display: grid; place-items: center; width: 6.2mm; height: 6.2mm; border-radius: 50%; background: var(--blue-soft); color: var(--blue-deep); font-size: 8.6pt; font-style: normal; font-weight: 700; }
+    .steps li::before { content: counter(s); }
+
+    .try { display: grid; grid-template-columns: 1fr 1fr; gap: 3.4mm 8mm; }
+    .try > div { display: grid; grid-template-columns: 6.2mm 1fr; gap: 2.8mm; }
+    .try b { display: block; color: var(--navy); }
+    .try span { display: block; color: var(--ink-2); font-size: 8.9pt; line-height: 1.42; }
+
+    .areas > div { display: grid; grid-template-columns: 34mm 1fr; gap: 2mm; padding: 1.5mm 0; border-bottom: .25mm solid var(--ring); font-size: 9.1pt; line-height: 1.42; }
+    .areas > div:first-child { border-top: .25mm solid var(--ring); }
+    .areas b { color: var(--navy); }
+    .areas span { color: var(--ink-2); }
+
+    .notes { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 8mm; }
+    .notes > div { font-size: 9.1pt; line-height: 1.45; color: var(--ink-2); }
+    .notes b { display: block; margin-bottom: .3mm; color: var(--navy); font-size: 9.6pt; }
+    .notes .wide { grid-column: 1 / -1; }
+    .notes .wide b + b, .inline { display: inline; margin: 0; font-size: inherit; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 9.1pt; line-height: 1.43; }
+    th { padding: 0 5mm 1.8mm 0; border-bottom: .4mm solid var(--navy); color: var(--muted); font-size: 7.6pt; font-weight: 600; letter-spacing: .06em; text-align: left; text-transform: uppercase; }
+    td { padding: 1.9mm 5mm 1.9mm 0; border-bottom: .25mm solid var(--ring); vertical-align: top; color: var(--ink-2); }
+    td:first-child { width: 33mm; color: var(--navy); font-weight: 600; }
+    td:nth-child(2) { width: 60mm; }
+    th:last-child, td:last-child { padding-right: 0; }
+
+    .tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3.5mm; }
+    .tier { padding: 3.6mm 3.8mm; border: .3mm solid var(--ring); border-radius: 2.2mm; }
+    .tier--here { border-color: var(--blue); background: var(--tint); }
+    .tier h3 { display: flex; align-items: center; justify-content: space-between; color: var(--navy); font-size: 12.5pt; font-weight: 700; }
+    .chip { padding: .5mm 2.2mm; border-radius: 3mm; background: var(--blue-soft); color: var(--blue-deep); font-size: 7.4pt; font-weight: 600; }
+    .tier--here .chip { background: var(--good-soft); color: var(--good); }
+    .tier p { margin-top: 1.2mm; color: var(--ink); font-weight: 600; line-height: 1.38; }
+    .tier ul { margin: 1.8mm 0 0 3.8mm; color: var(--ink-2); font-size: 8.7pt; line-height: 1.4; }
+    .tier li + li { margin-top: .9mm; }
+    .after { margin-top: 2.6mm; color: var(--ink-2); }
+
+    .small { padding: 3.6mm 4.4mm; border-radius: 2mm; background: var(--soft); color: var(--ink-2); font-size: 8.8pt; }
+    .small b { color: var(--navy); }
+  </style>
+</head>
+<body>
+
+  <!-- ================================================================ page 1 -->
+  <div class="sheet" id="p1">
+    <header class="cover">
+      <div class="cover__top">
+        <div class="brand"><img src="../../vendor/brand/neo-erp-mark.png" alt=""><span>Neo ERP</span></div>
+        <div class="by"><span>by</span><img src="../../vendor/brand/thebizcfo-logo-white-strip.png" alt="The Biz CFO"></div>
+      </div>
+      <h1>The Happy Bakers demo</h1>
+      <p>A short guide: what the demo shows, how to explore it, and how it differs from a live system.</p>
+    </header>
+
+    <div class="body">
+      <section>
+        <p class="lead">Happy Bakers is a bakery we made up to show Neo ERP at work on a business you can picture. It is an all-vegetarian, eggless bakery factory in Anand, Gujarat. It bakes bread, pav, burger buns, toast, khari and puffs, 18 products in all, and supplies 40 retail outlets on four van routes, 10 corporate customers and its own three stores. It has 35 employees and sells about Rs 4 crore a year.</p>
+        <p class="lead">You can do more than look. Post a dispatch sheet, raise a purchase order, record a production run or enter a store's day-end, and the stock, the balances, the costs and the dashboard change at once.</p>
+        <div class="shot"><img src="dashboard.png" alt="The dashboard of the demo"></div>
+        <p class="cap">The dashboard: sales, collections, margin, production, stale returns, spend and cash for the dates you choose, and what needs attention today.</p>
+      </section>
+
+      <section>
+        <h2>Getting started</h2>
+        <ol class="steps">
+          <li><div>Open the link on a laptop or desktop. If it asks you to sign in, use the details we sent with it.</div></li>
+          <li><div>You start on the dashboard as <b>Nilesh Patel, the Owner</b>, who can see and do everything.</div></li>
+          <li><div>Pick another person from the top-right corner to see what their role sees: accounts, purchase and stores, production, sales and dispatch, or a store manager. The menu, the figures and the buttons follow the role.</div></li>
+          <li><div>Use the dates at the top of a screen to look at any month since January 2026.</div></li>
+          <li><div>Open <b>Try this</b> in the menu and follow a journey. The eight journeys are on the next page.</div></li>
+        </ol>
+      </section>
+    </div>
+
+    <footer class="foot"><div><span>This is a demo based on test data. Happy Bakers is a fictional company.</span><span>thebizcfo.com &nbsp;|&nbsp; 1 of 3</span></div></footer>
+  </div>
+
+  <!-- ================================================================ page 2 -->
+  <div class="sheet" id="p2">
+    <div class="run"><span><img src="../../vendor/brand/neo-erp-mark.png" alt="">The Happy Bakers demo</span><span>A short guide</span></div>
+
+    <div class="body">
+      <section>
+        <h2>Eight things to try</h2>
+        <p class="intro"><b>Try this</b>, in the menu, lists these and ticks each step as you post it. The Owner can do every step.</p>
+        <div class="try">
+          <div><i>1</i><div><b>Post today's dispatch for a route</b><span>Every outlet on the route gets its invoice. Sales, finished stock and cash move.</span></div></div>
+          <div><i>2</i><div><b>Buy flour at a higher rate</b><span>Raise the order and receive the goods. The cost of bread and its margin move.</span></div></div>
+          <div><i>3</i><div><b>Enter a vendor bill that does not match</b><span>The bill is held because its rate differs from the order. Approve it as the Owner, then pay it.</span></div></div>
+          <div><i>4</i><div><b>Record a production run with rejects</b><span>See the yield of the run, and the production loss in the month's profit and loss.</span></div></div>
+          <div><i>5</i><div><b>Supply one of your own stores</b><span>Send stock, confirm it as the store manager, enter the day-end with expired units, approve the write-off.</span></div></div>
+          <div><i>6</i><div><b>Enter a large stale return</b><span>A return above the limit waits for the Owner. Approve it and read the outlet's statement.</span></div></div>
+          <div><i>7</i><div><b>Claim an expense</b><span>Submit it as the store manager, approve it, reimburse it. Spend by location moves.</span></div></div>
+          <div><i>8</i><div><b>Collect from a corporate customer</b><span>Record the payment and deposit the cash in the bank. Receivables and the cash book move.</span></div></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>What is in the demo</h2>
+        <div class="areas">
+          <div><b>Sell</b><span>Dispatch sheets by route, corporate orders, invoices, stale returns and receipts.</span></div>
+          <div><b>Own stores</b><span>Stock transfers to each store, and the store's day-end.</span></div>
+          <div><b>Buy</b><span>Purchase orders, goods receipts, vendor bills checked against both, and payments.</span></div>
+          <div><b>Make</b><span>Production runs with their yield, recipes, and a cost sheet for each product.</span></div>
+          <div><b>Stock</b><span>Stock on hand by location, batches with best-before dates, the stock ledger and counts.</span></div>
+          <div><b>Expenses and people</b><span>Expense claims with approval, and the employee directory.</span></div>
+          <div><b>Accounts</b><span>Receivables, payables, cash and bank, monthly profit and loss, product margin, GST summary.</span></div>
+          <div><b>Control</b><span>Approvals, reports that export to CSV, an audit log of every entry, a log of email alerts.</span></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>How the demo data works</h2>
+        <div class="notes">
+          <div><b>Test data</b>Happy Bakers does not exist. Every customer, vendor and employee name is invented, and any likeness to a real business or person is a coincidence.</div>
+          <div><b>Books since 1 January 2026</b>The books open that day with opening balances. Every document from then to the day before you open the demo was written by a day-by-day simulation of the business, so the figures are complete and add up.</div>
+          <div><b>Today is yours</b>The demo takes the day you first open it as its business date and keeps it. That day's dispatch, transfers, receipts and production wait for you to post. On a later day, a line at the top offers a fresh copy dated that day.</div>
+          <div><b>Your entries stay with you</b>What you enter is saved in your own browser, on your own device. It is not sent to us or to anyone else, and another browser or device opens its own copy.</div>
+          <div class="wide"><b>Starting again</b>Choose <b class="inline">Fresh copy dated today</b> from the top-right menu. It discards what you entered and builds the history again.</div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="foot"><div><span>This is a demo based on test data. Happy Bakers is a fictional company.</span><span>thebizcfo.com &nbsp;|&nbsp; 2 of 3</span></div></footer>
+  </div>
+
+  <!-- ================================================================ page 3 -->
+  <div class="sheet" id="p3">
+    <div class="run"><span><img src="../../vendor/brand/neo-erp-mark.png" alt="">The Happy Bakers demo</span><span>A short guide</span></div>
+
+    <div class="body">
+      <section>
+        <h2>The demo and a live system</h2>
+        <p class="intro">The demo runs on its own in your browser, so a few things differ from a live Neo ERP.</p>
+        <table>
+          <thead><tr><th></th><th>In the demo</th><th>In a live system</th></tr></thead>
+          <tbody>
+            <tr><td>Connections</td><td>Switched off.</td><td>Connections to Tally, Zoho Books, banks and GST verification are set up as part of iNeo and NeoX.</td></tr>
+            <tr><td>Email alerts</td><td>The Notification log lists the emails. None is sent.</td><td>Neo ERP emails approval requests, overdue receivables, bills falling due, low stock and stock near expiry.</td></tr>
+            <tr><td>Users</td><td>Six people to switch between, with no passwords of their own.</td><td>Each person signs in to their own account and sees what their role allows.</td></tr>
+            <tr><td>Attendance, leave and tasks</td><td>Left out to keep the demo short.</td><td>Part of Neo ERP.</td></tr>
+            <tr><td>Earlier history</td><td>The books start on 1 January 2026 with opening balances.</td><td>Neo ERP starts with your opening balances at go-live. Bringing in 12 to 18 months of history is part of iNeo.</td></tr>
+            <tr><td>GST</td><td>A summary of output and input GST by rate. Nothing is filed.</td><td>The same summary on your own documents, to check your return against.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>The three offerings</h2>
+        <div class="tiers">
+          <div class="tier tier--here">
+            <h3>Neo ERP <span class="chip">This demo</span></h3>
+            <p>Digitise daily work in one shared system.</p>
+            <ul>
+              <li>Finance: receivables, payables and reporting</li>
+              <li>Expenses, vendors and inventory</li>
+              <li>People: records, attendance and leave, and tasks</li>
+              <li>Approvals with email reminders, roles and an audit log</li>
+              <li>Standard reports from go-live</li>
+            </ul>
+          </div>
+          <div class="tier">
+            <h3>iNeo <span class="chip">Adds</span></h3>
+            <p>Connect outside systems, bring in history and add basic budgets.</p>
+            <ul>
+              <li>Agreed connections such as the bank, Tally or Zoho Books and GST verification</li>
+              <li>12 to 18 months of earlier history</li>
+              <li>Month-on-month and year-on-year dashboards</li>
+              <li>Automation across functions: low stock raises a purchase requirement</li>
+              <li>Basic budgets, with budget against actual</li>
+            </ul>
+          </div>
+          <div class="tier">
+            <h3>NeoX <span class="chip">Adds</span></h3>
+            <p>Analyse several years, forecast and plan.</p>
+            <ul>
+              <li>Analysis across several years of history</li>
+              <li>Statistical forecasting, such as a sales forecast with suggested production and a 30/60/90-day cash projection</li>
+              <li>Integrated budgets and scenarios</li>
+            </ul>
+          </div>
+        </div>
+        <p class="after">In the demo, a locked card marks each place where iNeo or NeoX adds something. <b>Higher tiers</b> lists them.</p>
+      </section>
+
+      <section>
+        <div class="small"><b>Please note.</b> Happy Bakers is a fictional company and the demo runs on test data. Its names, prices and figures are invented for illustration. To talk about what Neo ERP would look like for your own business, reach us at <b>thebizcfo.com</b>.</div>
+      </section>
+    </div>
+
+    <footer class="foot"><div><span>This is a demo based on test data. Happy Bakers is a fictional company.</span><span>thebizcfo.com &nbsp;|&nbsp; 3 of 3</span></div></footer>
+  </div>
+
+</body>
+</html>

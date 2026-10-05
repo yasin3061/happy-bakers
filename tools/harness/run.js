@@ -75,6 +75,9 @@ html = html.replace('</body>', '  <script src="' + pathToFileURL(path.join(__dir
   '  <script src="' + pathToFileURL(steps).href + '"></script>\n</body>');
 const page = path.join(dir, 'page.html');
 fs.writeFileSync(page, html);
+/* Images whose path a script sets while the page runs (the brand block of js/app.js) are asked for relative to the
+   scratch page, which the rewrite above cannot reach: they are copied beside it. */
+fs.cpSync(path.join(ROOT, 'vendor', 'brand'), path.join(dir, 'vendor', 'brand'), { recursive: true });
 
 const res = cp.spawnSync(chromePath(), [
   '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--hide-scrollbars',

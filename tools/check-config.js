@@ -1707,7 +1707,7 @@ var ROUTES = ['#/home', '#/approvals', '#/guide', '#/sell/dispatch', '#/sell/cor
   '#/stores/transfers', '#/stores/dayend', '#/buy/orders', '#/buy/receipts', '#/buy/bills', '#/buy/payments', '#/make/production', '#/make/recipes',
   '#/stock/onhand', '#/stock/batches', '#/stock/ledger', '#/stock/counts', '#/expenses', '#/people', '#/accounts/receivables', '#/accounts/payables',
   '#/accounts/cash', '#/accounts/pnl', '#/accounts/margin', '#/accounts/gst', '#/reports', '#/masters/items', '#/masters/parties', '#/masters/setup',
-  '#/system/audit', '#/system/notifications', '#/system/tiers', '#/system/about'];
+  '#/system/audit', '#/system/notifications', '#/system/tiers'];
 /* route -> page id, for the persona a step suggests */
 function pageOf(route) { return route === '#/home' || route === '#/approvals' || route === '#/guide' || route === '#/expenses' || route === '#/people' || route === '#/reports'
   ? route.slice(2) : route.slice(2).replace('accounts/', 'acc-').replace('system/', 'sys-').replace('/', '-'); }

@@ -150,6 +150,11 @@ HB.router.register({
 });
 ```
 
+A tile takes no delta and no spark. The landing dashboard (`js/pages/home.js`) is the one place whose tiles carry a
+small chart: the days of the range of the filter bar, or its months, from `HB.data.dash.period(f).points`, drawn with
+`HB.charts.sparkline` (`fluid`, `labels`: CHARTS-API section 6) and appended to the tile. It shows that range and nothing
+else, never a change against another period; no other screen puts a chart in a tile.
+
 ## 3. Conventions
 
 **State.** Everything the user has done and not posted lives in `ctx.state` (per route, kept across redraws, persona switches

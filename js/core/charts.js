@@ -1904,28 +1904,71 @@
     instances.slice().forEach(function (inst) {
       if (!container || container === inst.el || container.contains(inst.el)) inst.dispose();
     });
+    hideSparkTip(); /* the readout of a small chart goes with the screen it was on */
   }
 
   /* ================================================================== sparkline (inline SVG, no ECharts) */
 
+  /* The one readout of the fluid sparklines: the value and the name of the point under the pointer. */
+  var sparkTip = null, sparkOff = null; /* sparkOff: takes the hover marks of the line being read away again */
+
+  /** Away with the readout and the marks of the line it belongs to: the pointer left, the page scrolled, or the screen is drawn again. */
+  function hideSparkTip() {
+    var off = sparkOff;
+    sparkOff = null;
+    if (off) off();
+    if (sparkTip && sparkTip.parentNode) sparkTip.parentNode.removeChild(sparkTip);
+  }
+
+  /** Values lead, names follow; above the point, kept inside the window. x and y are window coordinates. */
+  function showSparkTip(x, y, valueText, nameText) {
+    if (!sparkTip) {
+      sparkTip = el('div', 'mk-tip mk-sparktip');
+      /* the readout is fixed to the window: when anything scrolls, the point is no longer under it */
+      doc.addEventListener('scroll', hideSparkTip, true);
+    }
+    empty(sparkTip);
+    sparkTip.appendChild(el('div', 'mk-sparktip__val', valueText));
+    sparkTip.appendChild(el('div', 'mk-sparktip__name', nameText));
+    if (!sparkTip.parentNode) doc.body.appendChild(sparkTip);
+    var tw = sparkTip.offsetWidth, th = sparkTip.offsetHeight, vw = doc.documentElement.clientWidth;
+    sparkTip.style.left = Math.round(clamp(x - tw / 2, 8, Math.max(8, vw - tw - 8))) + 'px';
+    sparkTip.style.top = Math.round(y - th - 12 < 8 ? y + 14 : y - th - 12) + 'px';
+  }
+
+  /**
+   * sparkline(target, values, opts) - opts as in docs/shell/CHARTS-API.md section 6. The defaults draw the small grey
+   * line of a table cell. A page that wants a chart inside a tile adds: `fluid` (the line takes the width of its
+   * container; the svg is stretched sideways while strokes and the end dot keep their size), `lineVar` and
+   * `strokeWidth` (the line's colour token and weight), and `labels` (the name of each point: the accessible label
+   * then says the first, the last and the highest point in words, with no change between them, and a fluid line
+   * reads out the point under the pointer).
+   */
   function sparkline(target, values, opts) {
     var o = opts || {};
+    var fluid = !!o.fluid;
     var w = o.width || 96, h = o.height || 28, pad = 4;
+    /* a fluid line runs from edge to edge of its box, and its end dot overhangs: the box, not the drawing, is inset (css/charts.css) */
+    var padX = fluid ? 0 : pad, padY = fluid ? 6 : pad;
     var fmt = makeFormatter(o.format || 'num');
     var pts = (values || []).map(num);
     var nums = pts.filter(isNum);
+    var names = Array.isArray(o.labels) ? strings(o.labels) : null;
 
-    var node = svg('svg', { 'class': 'mk-spark', width: String(w), height: String(h), viewBox: '0 0 ' + w + ' ' + h, role: 'img', focusable: 'false' });
+    var node = svg('svg', { 'class': 'mk-spark' + (fluid ? ' mk-spark--fluid' : ''), width: fluid ? '100%' : String(w), height: String(h), viewBox: '0 0 ' + w + ' ' + h, role: 'img', focusable: 'false' });
+    if (fluid) node.setAttribute('preserveAspectRatio', 'none');
     var label = o.label ? o.label + ': ' : '';
+    hideSparkTip(); /* a redraw under the pointer leaves no readout behind */
 
     if (!nums.length) {
       node.setAttribute('aria-label', label + 'no data');
-      node.appendChild(svg('path', { 'class': 'mk-spark__line mk-spark__line--empty', d: 'M' + pad + ' ' + (h / 2) + 'H' + (w - pad) }));
+      node.appendChild(svg('path', { 'class': 'mk-spark__line mk-spark__line--empty', d: 'M' + padX + ' ' + (h / 2) + 'H' + (w - padX) }));
     } else {
       var lo = Math.min.apply(null, nums), hi = Math.max.apply(null, nums), flat = hi === lo;
       var n = pts.length;
-      var xAt = function (i) { return n === 1 ? w - pad : pad + (w - 2 * pad) * i / (n - 1); };
-      var yAt = function (v) { return flat ? h / 2 : pad + (h - 2 * pad) * (1 - (v - lo) / (hi - lo)); };
+      var xAt = function (i) { return n === 1 ? w - padX : padX + (w - 2 * padX) * i / (n - 1); };
+      var yAt = function (v) { return flat ? h / 2 : padY + (h - 2 * padY) * (1 - (v - lo) / (hi - lo)); };
+      var at = function (i) { return 'M' + xAt(i).toFixed(1) + ' ' + yAt(pts[i]).toFixed(1) + 'h0.01'; }; /* a point as a path: with a round cap it draws a dot */
       var dPath = '', runs = [], run = [];
       pts.forEach(function (v, i) {
         if (v === null) { if (run.length) runs.push(run); run = []; return; }
@@ -1934,25 +1977,80 @@
       if (run.length) runs.push(run);
       runs.forEach(function (r) {
         r.forEach(function (p, i) { dPath += (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); });
+        if (r.length === 1) dPath += 'h0.01'; /* a point with a gap on both sides is still a mark */
       });
       if (o.area && runs.length === 1 && runs[0].length > 1) {
         var r0 = runs[0];
         node.appendChild(svg('path', { 'class': 'mk-spark__area', d: dPath + 'L' + r0[r0.length - 1][0].toFixed(1) + ' ' + (h - 1) + 'L' + r0[0][0].toFixed(1) + ' ' + (h - 1) + 'Z' }));
       }
-      node.appendChild(svg('path', { 'class': 'mk-spark__line', d: dPath }));
+      var line = svg('path', { 'class': 'mk-spark__line', d: dPath });
+      if (o.lineVar) line.style.stroke = cssVar(o.lineVar);
+      if (o.strokeWidth) line.style.strokeWidth = String(o.strokeWidth);
+      node.appendChild(line);
       var li = lastIndex(pts);
       if (o.emphasiseLast !== false && li >= 0) {
-        var dot = svg('circle', { 'class': 'mk-spark__dot', cx: xAt(li).toFixed(1), cy: yAt(pts[li]).toFixed(1), r: '3' });
-        dot.style.fill = cssVar(o.colourVar || '--seq-500');
-        node.appendChild(dot);
+        if (fluid) {
+          /* a circle would be stretched with the box: a zero-length stroke with a round cap stays round, ring first */
+          node.appendChild(svg('path', { 'class': 'mk-spark__ring', d: at(li) }));
+          var end = svg('path', { 'class': 'mk-spark__end', d: at(li) });
+          end.style.stroke = cssVar(o.colourVar || '--seq-500');
+          node.appendChild(end);
+        } else {
+          var dot = svg('circle', { 'class': 'mk-spark__dot', cx: xAt(li).toFixed(1), cy: yAt(pts[li]).toFixed(1), r: '3' });
+          dot.style.fill = cssVar(o.colourVar || '--seq-500');
+          node.appendChild(dot);
+        }
       }
-      var first = nums[0], last = nums[nums.length - 1];
-      var change = HB.fmt && first ? HB.fmt.delta(last, first).label : '';
-      node.setAttribute('aria-label', label + fmt(first, 'tooltip') + ' to ' + fmt(last, 'tooltip') + (change && change !== '-' ? ' (' + change + ')' : ''));
+      var fi = pts.indexOf(nums[0]), first = nums[0], last = nums[nums.length - 1];
+      if (names) {
+        /* first, last and highest, each with the name of its point: what the line shows, and no change between two of them */
+        var hiAt = pts.indexOf(hi), say = function (i) { return fmt(pts[i], 'tooltip') + (names[i] ? ' (' + names[i] + ')' : ''); };
+        node.setAttribute('aria-label', label + (nums.length === 1 ? say(fi) : 'first ' + say(fi) + ', last ' + say(li) + ', highest ' + say(hiAt)));
+      } else {
+        var change = HB.fmt && first ? HB.fmt.delta(last, first).label : '';
+        node.setAttribute('aria-label', label + fmt(first, 'tooltip') + ' to ' + fmt(last, 'tooltip') + (change && change !== '-' ? ' (' + change + ')' : ''));
+      }
+      if (fluid && names) sparkHover(node, pts, names, { w: w, h: h, xAt: xAt, at: at, fmt: fmt });
     }
 
     if (target) { empty(target); target.appendChild(node); }
     return node;
+  }
+
+  /**
+   * The hover layer of a fluid sparkline: a hairline snaps to the point nearest the pointer, a small dot marks it on
+   * the line, and the readout names it. The whole box is the target, so nobody has to aim at a 2px line.
+   */
+  function sparkHover(node, pts, names, g) {
+    var cross = svg('path', { 'class': 'mk-spark__cross', d: '' }), probe = svg('path', { 'class': 'mk-spark__probe', d: '' });
+    var hit = svg('rect', { 'class': 'mk-spark__hit', x: '0', y: '0', width: String(g.w), height: String(g.h) });
+    function unmark() { cross.setAttribute('d', ''); probe.setAttribute('d', ''); }
+    function clear() { unmark(); hideSparkTip(); }
+    function nearest(i) {
+      for (var d = 0; d < pts.length; d++) {
+        if (isNum(pts[i - d])) return i - d;
+        if (isNum(pts[i + d])) return i + d;
+      }
+      return -1;
+    }
+    node.insertBefore(cross, node.firstChild);
+    node.appendChild(probe);
+    node.appendChild(hit);
+    node.addEventListener('pointermove', function (e) {
+      var r = node.getBoundingClientRect();
+      if (!r.width) return;
+      var i = nearest(pts.length === 1 ? 0 : clamp(Math.round((e.clientX - r.left) / r.width * (pts.length - 1)), 0, pts.length - 1));
+      if (i < 0) { clear(); return; }
+      var x = g.xAt(i);
+      if (sparkOff && sparkOff !== unmark) hideSparkTip(); /* another line was being read */
+      cross.setAttribute('d', 'M' + x.toFixed(1) + ' 0V' + g.h);
+      probe.setAttribute('d', g.at(i));
+      showSparkTip(r.left + x / g.w * r.width, r.top, g.fmt(pts[i], 'tooltip'), names[i]);
+      sparkOff = unmark;
+    });
+    node.addEventListener('pointerleave', clear);
+    node.addEventListener('pointercancel', clear);
+    node.addEventListener('click', clear); /* a tile that is clicked opens another screen: nothing is left behind */
   }
 
   /* ================================================================== public API */

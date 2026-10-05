@@ -1,8 +1,8 @@
-# Happy Bakers - Neo ERP sample
+# Happy Bakers - Neo ERP demo
 
-A clickable sample of **Neo ERP (Tier 1)**, built around a fictional bakery factory in Anand, Gujarat: about
+A clickable demo of **Neo ERP (Tier 1)**, built around a fictional bakery factory in Anand, Gujarat: about
 Rs 4 crore a year, 35 employees, 40 retail outlets on four van routes, 10 corporate customers and three own stores.
-It is a sales sample, not a product: plain HTML, CSS and JavaScript, no build step, no database and no application
+It is a sales demo, not a product: plain HTML, CSS and JavaScript, no build step, no database and no application
 backend.
 
 What sets it apart from a mock-up: **every figure on every screen comes from documents, and you can add documents.**
@@ -13,8 +13,8 @@ vendor and employee in it are invented.
 ## Open it
 
 - Double-click `index.html`. It runs from the file, offline, with nothing to install. Or
-- on Windows, double-click `start.bat`: it serves the sample on http://localhost:8347 without a sign-in and opens the
-  browser. Keep its window open while you use the sample; closing it stops the sample. It needs Node.js 20 or later. Or
+- on Windows, double-click `start.bat`: it serves the demo on http://localhost:8347 without a sign-in and opens the
+  browser. Keep its window open while you use the demo; closing it stops the demo. It needs Node.js 20 or later. Or
 - serve it with the sign-in in front, as the hosted preview runs it:
 
   ```
@@ -28,14 +28,14 @@ vendor and employee in it are invented.
 Node 20 or later, for the server and the checks only; no packages to install. A desktop browser, 1024 pixels wide or
 more.
 
-The sample takes the day it is first opened as its **business date** and keeps it: nothing ages while a copy sits
+The demo takes the day it is first opened as its **business date** and keeps it: nothing ages while a copy sits
 unused. History runs from 1 January 2026 to the day before. Come back on a later day and a banner offers a fresh
 copy dated today; "Fresh copy dated today" in the top-right menu does the same at any time, and discards what you
 entered.
 
 ## The personas
 
-The sample opens as the Owner. Switch from the top bar; the menu, the figures and what you may do follow the role.
+The demo opens as the Owner. Switch from the top bar; the menu, the figures and what you may do follow the role.
 A button a role may not use stays on screen, locked, with the reason.
 
 | Persona | Role | Sees | Does |
@@ -63,11 +63,25 @@ Every persona can raise an expense claim. Only the Owner approves.
 | Accounts | Receivables, payables, cash and bank, monthly profit and loss, product margin, GST summary |
 | Reports | Twenty registers, each with a date range and a CSV export |
 | Masters | Items and prices; customers and vendors; expense categories and locations |
-| System | Audit log; notification log (nothing is sent); what the higher tiers add; about this sample |
+| System | Audit log; notification log; what the higher tiers add |
 
 Start with **Try this** in the menu: eight short journeys that tick themselves as you post the entries they ask for,
 such as "raise a flour order at a higher rate, receive it, and see bread cost and margin move". Small locked cards
 mark where a higher tier (iNeo, NeoX) adds something; nothing behind them is built.
+
+## The handout
+
+The app says one thing about itself, at the foot of the sidebar: "This is a Demo based on test data". It has no
+About page and no notes on its screens about what the demo does not do; prospects read those as limits of the
+offering. Everything of that kind is in a three-page handout to give with the link:
+`docs/handout/Happy-Bakers-demo-guide.pdf`. It says what the demo shows and how to start, lists the eight journeys,
+explains how the data works (test data, the history since 1 January 2026, entries kept in the user's own browser,
+the fresh copy), how the demo differs from a live system (connections to Tally, Zoho Books, banks and GST
+verification, email alerts, user accounts, attendance and leave) and what the three offerings are.
+
+To change it, edit `docs/handout/handout.html` and run `node tools/handout.js`, which prints the PDF with the
+Chrome already on the computer. `docs/handout/dashboard-shot.js` says how to take the picture on its first page
+again.
 
 ## How the data works
 
@@ -90,11 +104,11 @@ rate far from the last purchase price, a day-end whose cash and UPI are far from
 the figure before posting, the entry can still be posted, and the audit log keeps the warning. The thresholds are in
 `js/data/config.js` (`limits.warn`). The history is never warned about.
 
-**Your entries are a log in the browser.** Local storage holds the business date, a version of the sample data and
+**Your entries are a log in the browser.** Local storage holds the business date, a version of the demo data and
 one numbered log of what you did: each document as entered, each approval, rejection, cancellation and master change.
 On every load the history is built again and the log is replayed on top of it in its original order, so a reload
 gives exactly the figures you left. Nothing is sent anywhere; another browser or device has its own copy. If the
-browser cannot save, a banner says that changes will not survive a reload. If the sample data has changed since a
+browser cannot save, a banner says that changes will not survive a reload. If the demo data has changed since a
 copy was saved, the copy starts afresh with a notice.
 
 ## Checks
@@ -124,12 +138,13 @@ In `docs/`, for people changing the code:
 
 | File | What it is |
 |---|---|
-| `SCOPE.md` | What is in the sample and what is not, as agreed. The yardstick |
+| `SCOPE.md` | What is in the demo and what is not, as agreed. The yardstick |
 | `SPEC.md` | The build contract: constraints, data model, engine, personas, selectors, pages |
 | `RESEARCH.md`, `CONFIG.md` | Every business parameter and where it comes from; how it sits in `js/data/config.js` |
 | `API.md` | The data layer as built: kernel, engine, operations, selectors. The authority on shapes |
 | `PAGES.md` | How a screen is written and tested |
 | `shell/UI-API.md`, `shell/CHARTS-API.md` | The UI kit and the chart wrapper |
+| `handout/` | The three-page handout given with the link: its source, its picture and the PDF |
 
 ## The sign-in
 
@@ -138,7 +153,7 @@ One username and password, checked on the server (`tools/serve.js`) against a fi
 - `server/users.json` holds the username and a **salted scrypt hash** of the password. The password itself is
   written nowhere. The file is created at start-up from the variables `LOGIN_USER` and `LOGIN_PASSWORD` and is not
   in the repository (`.gitignore`); on later starts without the variables the file on disk is used.
-- Without a file and without the variables the server refuses to start, so the sample is never served unprotected
+- Without a file and without the variables the server refuses to start, so the demo is never served unprotected
   by accident.
 - Until a browser has signed in it gets the sign-in screen and nothing else: not the page, not a script, not the
   data files.
